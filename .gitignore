@@ -1,0 +1,26 @@
+# Python
+venv/
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Verilator / simulación
+obj_dir/
+sim_build/
+*.vcd
+*.fst
+*.log
+
+# Editores / SO
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Archivos temporales
+*.tmp
+*.bak
+sim
+Comandos.txt
+results.xml
