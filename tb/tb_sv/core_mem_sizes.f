@@ -1,0 +1,12 @@
+rtl/core/alu.sv
+rtl/core/branch_unit.sv
+rtl/core/decoder.sv
+rtl/core/ex_mem_reg.sv
+rtl/core/hazard_unit.sv
+rtl/core/id_ex_reg.sv
+rtl/core/if_id_reg.sv
+rtl/core/imm_gen.sv
+rtl/core/mem_wb_reg.sv
+rtl/core/regfile.sv
+rtl/core/core_top.sv
+tb/tb_sv/tb_core_mem_sizes.sv

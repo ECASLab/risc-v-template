@@ -1,4 +1,5 @@
 # Python
+tb/cocotb/venv
 venv/
 .venv/
 __pycache__/
@@ -8,9 +9,11 @@ __pycache__/
 # Verilator / simulación
 obj_dir/
 sim_build/
+build/
 *.vcd
 *.fst
 *.log
+*.out
 
 # Editores / SO
 .DS_Store
