@@ -1,6 +1,7 @@
 `timescale 1ns/1ps
 
-
+// Decoder de instrucciones RISC-V
+// Toma una instrucción de 32 bits y genera las señales de control necesarias para ejecutar
 module decoder (
     input  logic [31:0] instr,
 
@@ -87,6 +88,13 @@ module decoder (
     localparam logic [3:0] ALU_SLT    = 4'd9;
     localparam logic [3:0] ALU_SLTU   = 4'd10;
 
+    // Operaciones RV64I de palabra (32 bits con sign-extension a 64 bits)
+    localparam logic [3:0] ALU_ADDW   = 4'd11;
+    localparam logic [3:0] ALU_SUBW   = 4'd12;
+    localparam logic [3:0] ALU_SLLW   = 4'd13;
+    localparam logic [3:0] ALU_SRLW   = 4'd14;
+    localparam logic [3:0] ALU_SRAW   = 4'd15;
+
     // -----------------------------
     // Tipos de branch (para controlar la lógica de decisión de las instrucciones de salto condicional)
     // -----------------------------
@@ -109,15 +117,17 @@ module decoder (
     // -----------------------------
     // Opcodes usados en esta etapa
     // -----------------------------
-    localparam logic [6:0] OPCODE_LUI    = 7'b0110111;
-    localparam logic [6:0] OPCODE_AUIPC  = 7'b0010111;
-    localparam logic [6:0] OPCODE_JAL    = 7'b1101111;
-    localparam logic [6:0] OPCODE_JALR   = 7'b1100111;
-    localparam logic [6:0] OPCODE_OP_IMM = 7'b0010011;
-    localparam logic [6:0] OPCODE_OP     = 7'b0110011;
-    localparam logic [6:0] OPCODE_BRANCH = 7'b1100011;
-    localparam logic [6:0] OPCODE_STORE  = 7'b0100011;
-    localparam logic [6:0] OPCODE_LOAD   = 7'b0000011;
+    localparam logic [6:0] OPCODE_LUI       = 7'b0110111;
+    localparam logic [6:0] OPCODE_AUIPC     = 7'b0010111;
+    localparam logic [6:0] OPCODE_JAL       = 7'b1101111;
+    localparam logic [6:0] OPCODE_JALR      = 7'b1100111;
+    localparam logic [6:0] OPCODE_OP_IMM    = 7'b0010011;
+    localparam logic [6:0] OPCODE_OP_IMM_32 = 7'b0011011;   // RV64I: ADDIW/SLLIW/SRLIW/SRAIW
+    localparam logic [6:0] OPCODE_OP        = 7'b0110011;
+    localparam logic [6:0] OPCODE_OP_32     = 7'b0111011;   // RV64I: ADDW/SUBW/SLLW/SRLW/SRAW
+    localparam logic [6:0] OPCODE_BRANCH    = 7'b1100011;
+    localparam logic [6:0] OPCODE_STORE     = 7'b0100011;
+    localparam logic [6:0] OPCODE_LOAD      = 7'b0000011;
 
     always_comb begin
         // -------------------------
@@ -247,6 +257,91 @@ module decoder (
                             alu_op = ALU_SRL;
                         else if (funct6 == 6'b010000)
                             alu_op = ALU_SRA;
+                        else
+                            illegal_instr = 1'b1;
+                    end
+
+                    default: begin
+                        illegal_instr = 1'b1;
+                    end
+                endcase
+            end
+
+            OPCODE_OP_32: begin
+                reg_write     = 1'b1;
+                alu_src_a_sel = ALU_SRC_A_RS1;
+                alu_src_b_sel = ALU_SRC_B_RS2;
+
+                rs1_used = 1'b1;
+                rs2_used = 1'b1;
+
+                case (funct3)
+                    3'b000: begin
+                        if (funct7 == 7'b0000000)
+                            alu_op = ALU_ADDW;  // ADDW
+                        else if (funct7 == 7'b0100000)
+                            alu_op = ALU_SUBW;  // SUBW
+                        else
+                            illegal_instr = 1'b1;
+                    end
+
+                    3'b001: begin
+                        if (funct7 == 7'b0000000)
+                            alu_op = ALU_SLLW;  // SLLW
+                        else
+                            illegal_instr = 1'b1;
+                    end
+
+                    3'b101: begin
+                        if (funct7 == 7'b0000000)
+                            alu_op = ALU_SRLW;  // SRLW
+                        else if (funct7 == 7'b0100000)
+                            alu_op = ALU_SRAW;  // SRAW
+                        else
+                            illegal_instr = 1'b1;
+                    end
+
+                    default: begin
+                        illegal_instr = 1'b1;
+                    end
+                endcase
+            end
+
+            // ---------------------------------
+            // OP-IMM-32 (RV64I)
+            // ADDIW, SLLIW, SRLIW, SRAIW
+            // Resultado de 32 bits sign-extended a 64 bits
+            // ---------------------------------
+            OPCODE_OP_IMM_32: begin
+                imm_sel       = IMM_I;
+                reg_write     = 1'b1;
+                alu_src_a_sel = ALU_SRC_A_RS1;
+                alu_src_b_sel = ALU_SRC_B_IMM;
+
+                rs1_used = 1'b1;
+
+                case (funct3)
+                    3'b000: begin
+                        // ADDIW
+                        alu_op = ALU_ADDW;
+                    end
+
+                    3'b001: begin
+                        // SLLIW: funct7 debe ser 0000000
+                        if (funct7 == 7'b0000000)
+                            alu_op = ALU_SLLW;
+                        else
+                            illegal_instr = 1'b1;
+                    end
+
+                    3'b101: begin
+                        // SRLIW / SRAIW
+                        // SRLIW: funct7 = 0000000
+                        // SRAIW: funct7 = 0100000
+                        if (funct7 == 7'b0000000)
+                            alu_op = ALU_SRLW;
+                        else if (funct7 == 7'b0100000)
+                            alu_op = ALU_SRAW;
                         else
                             illegal_instr = 1'b1;
                     end

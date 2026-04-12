@@ -21,7 +21,19 @@ module alu (
     localparam logic [3:0] ALU_SLT    = 4'd9;
     localparam logic [3:0] ALU_SLTU   = 4'd10;
 
-    always @(*) begin
+    // Operaciones RV64I tipo *W
+    localparam logic [3:0] ALU_ADDW   = 4'd11;
+    localparam logic [3:0] ALU_SUBW   = 4'd12;
+    localparam logic [3:0] ALU_SLLW   = 4'd13;
+    localparam logic [3:0] ALU_SRLW   = 4'd14;
+    localparam logic [3:0] ALU_SRAW   = 4'd15;
+
+    logic [31:0] word_result;
+
+    always_comb begin
+        result      = 64'd0;
+        word_result = 32'd0;
+
         case (alu_op)
             ALU_ADD: begin
                 result = a + b;
@@ -43,12 +55,7 @@ module alu (
                 result = a ^ b;
             end
 
-            // En RV64I, shifts usan solo los 6 bits bajos del desplazamiento
-            // Para SLL/SRL/SRA, b viene de rs2
-            // Para SLLI/SRLI/SRAI, b viene del inmediato sign-extended, pero los 6 bits bajos siguen siendo el shamt
-            
-            // SLR/SLL: Mete ceros por la derecha/izquierda
-            // SRA: Copia el bit de signo
+            // RV64I: shifts de 64 bits usan 6 bits de desplazamiento
             ALU_SLL: begin
                 result = a << b[5:0];
             end
@@ -61,18 +68,45 @@ module alu (
                 result = $signed(a) >>> b[5:0];
             end
 
-            // Útil para LUI: resultado = inmediato (Podría implementarse como suma con cero)
             ALU_PASS_B: begin
                 result = b;
             end
 
-            // SLT/SLTU: resultado es 1 si a < b, 0 en caso contrario. Para SLT se compara como signed, para SLTU como unsigned
             ALU_SLT: begin
                 result = ($signed(a) < $signed(b)) ? 64'd1 : 64'd0;
             end
 
             ALU_SLTU: begin
                 result = (a < b) ? 64'd1 : 64'd0;
+            end
+
+            // =========================================
+            // RV64I tipo *W:
+            // operan sobre 32 bits y sign-extienden a 64
+            // =========================================
+            ALU_ADDW: begin
+                word_result = a[31:0] + b[31:0];
+                result      = {{32{word_result[31]}}, word_result};
+            end
+
+            ALU_SUBW: begin
+                word_result = a[31:0] - b[31:0];
+                result      = {{32{word_result[31]}}, word_result};
+            end
+
+            ALU_SLLW: begin
+                word_result = a[31:0] << b[4:0];
+                result      = {{32{word_result[31]}}, word_result};
+            end
+
+            ALU_SRLW: begin
+                word_result = a[31:0] >> b[4:0];
+                result      = {{32{word_result[31]}}, word_result};
+            end
+
+            ALU_SRAW: begin
+                word_result = $signed(a[31:0]) >>> b[4:0];
+                result      = {{32{word_result[31]}}, word_result};
             end
 
             default: begin
