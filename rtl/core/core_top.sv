@@ -1,7 +1,8 @@
 `timescale 1ns/1ps
 
 module core_top #(
-    parameter logic [63:0] RESET_PC = 64'd0
+    parameter logic [63:0] RESET_PC = 64'd0,
+    parameter logic [63:0] TRAP_VECTOR = 64'h0000_0000_0000_0100
 ) (
     input  logic        clk,    // reloj del core
     input  logic        rst,    // reset síncrono del core
@@ -15,7 +16,6 @@ module core_top #(
 
     // -----------------------------
     // Data memory interface
-    // (por ahora solo stores)
     // -----------------------------
     output logic        dmem_we,    // habilitación de escritura (store)
     output logic [7:0]  dmem_wstrb,  // byte enables para la operación de store (calculados a partir de dmem_size y dmem_addr)
@@ -44,7 +44,19 @@ module core_top #(
     localparam logic [1:0] FWD_MEM  = 2'b01;
     localparam logic [1:0] FWD_WB   = 2'b10;
 
+    // Códigos de excepción para mcause (se pueden ampliar según necesidades, por ejemplo para incluir excepciones de memoria o de sistema)
+    localparam logic [63:0] MCAUSE_INSTR_ADDR_MISALIGNED = 64'd0;
+    localparam logic [63:0] MCAUSE_ILLEGAL_INSTR         = 64'd2;
+    localparam logic [63:0] MCAUSE_BREAKPOINT            = 64'd3;
+    localparam logic [63:0] MCAUSE_ECALL_M               = 64'd11;
 
+
+    // =========================================================
+    // CSRs mínimos internos para traps
+    // =========================================================
+    logic [63:0] csr_mtvec;
+    logic [63:0] csr_mepc;
+    logic [63:0] csr_mcause;
 
     // =========================================================
     // PC / IF stage 
@@ -93,7 +105,6 @@ module core_top #(
     assign ex_mem_stall = 1'b0;
     assign mem_wb_stall = 1'b0;
 
-    assign ex_mem_flush = 1'b0; // El flush hacia EX/MEM se controla desde ID/EX (por ahora no hay flushes específicos para EX/MEM)
     assign mem_wb_flush = 1'b0; // El flush hacia MEM/WB se controla desde ID/EX (por ahora no hay flushes específicos para MEM/WB)
 
 
@@ -104,6 +115,9 @@ module core_top #(
     logic        id_valid_out;  // Señal de valid para ID stage
     logic [63:0] id_pc_out;     // Salida de PC desde IF/ID (para usar en ID y también pasar a EX)
     logic [31:0] id_instr_out;  // Salida de instrucción desde IF/ID (para usar en ID y también pasar a EX)
+    logic        id_sys_ecall;
+    logic        id_sys_ebreak;
+    logic        id_sys_mret;
 
     // Registros IF/ID con lógica de stall y flush 
     if_id_reg u_if_id_reg (
@@ -118,7 +132,6 @@ module core_top #(
         .id_pc_out    (id_pc_out),
         .id_instr_out (id_instr_out)
     );
-
 
 
     // =========================================================
@@ -154,6 +167,18 @@ module core_top #(
 
     logic       dec_illegal_instr_raw;      // Señal de instrucción ilegal decodificada
 
+    // Señales decodificadas para instrucciones de memoria
+    logic       dec_sys_ecall_raw;
+    logic       dec_sys_ebreak_raw;
+    logic       dec_sys_mret_raw;
+
+    // Señales crudas desde el decoder para instrucciones CSR
+    logic       dec_csr_en_raw;
+    logic [1:0] dec_csr_cmd_raw;
+    logic       dec_csr_use_imm_raw;
+    logic       dec_csr_read_raw;
+    logic       dec_csr_write_raw;
+
     // Módulo de decodificación de instrucciones 
     decoder u_decoder (
         .instr         (id_instr_out),      // Instrucción a decodificar
@@ -176,8 +201,16 @@ module core_top #(
         .load_size     (dec_load_size_raw),
         .load_unsigned (dec_load_unsigned_raw),
         .wb_sel_mem    (dec_wb_sel_mem_raw),
+        .csr_en        (dec_csr_en_raw),
+        .csr_cmd       (dec_csr_cmd_raw),
+        .csr_use_imm   (dec_csr_use_imm_raw),
+        .csr_read      (dec_csr_read_raw),
+        .csr_write     (dec_csr_write_raw),
         .rs1_used      (dec_rs1_used_raw),
-        .rs2_used      (dec_rs2_used_raw)
+        .rs2_used      (dec_rs2_used_raw),
+        .sys_ecall     (dec_sys_ecall_raw), // Señal de decodificación de ECALL
+        .sys_ebreak    (dec_sys_ebreak_raw),// Señal de decodificación de EBREAK        
+        .sys_mret      (dec_sys_mret_raw)   // Señal de decodificación de MRET
     );
 
     // Gateo de señales de control por valid (si no es válida, se ponen en valores que no hagan nada)
@@ -208,6 +241,13 @@ module core_top #(
     logic       id_jump;             // Señal de control de jump "gateada" por valid
 
     logic       id_illegal_instr;    // Señal de instrucción ilegal "gateada" por valid
+
+    // Señales "gateadas" por valid para instrucciones de sistema
+    logic       id_csr_en;
+    logic [1:0] id_csr_cmd;
+    logic       id_csr_use_imm;
+    logic       id_csr_read;
+    logic       id_csr_write;
 
     // Lógica combinacional para gatear las señales de control por valid
     always_comb begin
@@ -240,6 +280,16 @@ module core_top #(
 
         id_illegal_instr = 1'b0;
 
+        id_sys_ecall    = 1'b0;
+        id_sys_ebreak   = 1'b0;
+        id_sys_mret     = 1'b0;
+
+        id_csr_en       = 1'b0;
+        id_csr_cmd      = 2'b00;
+        id_csr_use_imm  = 1'b0;
+        id_csr_read     = 1'b0;
+        id_csr_write    = 1'b0;
+
         // Si la instrucción es válida, se pasan las señales decodificadas a través del "gateo" para que lleguen a ID/EX y el resto de la pipeline con los valores correctos 
         if (id_valid_out) begin
             id_rs1_addr      = dec_rs1_addr_raw;        // Dirección rs1 "gateada" por valid
@@ -269,6 +319,16 @@ module core_top #(
             id_wb_sel_mem    = dec_wb_sel_mem_raw;
             id_rs1_used      = dec_rs1_used_raw;
             id_rs2_used      = dec_rs2_used_raw;
+
+            id_sys_ecall    = dec_sys_ecall_raw;
+            id_sys_ebreak   = dec_sys_ebreak_raw;
+            id_sys_mret     = dec_sys_mret_raw;
+
+            id_csr_en       = dec_csr_en_raw;
+            id_csr_cmd      = dec_csr_cmd_raw;
+            id_csr_use_imm  = dec_csr_use_imm_raw;
+            id_csr_read     = dec_csr_read_raw;
+            id_csr_write    = dec_csr_write_raw;
         end
     end
 
@@ -342,6 +402,17 @@ module core_top #(
     logic        ex_jump_out;       // Señal de control de jump pasada a EX
 
     logic        ex_illegal_instr_out;  // Señal de instrucción ilegal pasada a EX
+
+    logic        ex_sys_ecall_out;
+    logic        ex_sys_ebreak_out;
+    logic        ex_sys_mret_out;
+
+    logic        ex_csr_en_out;
+    logic [1:0]  ex_csr_cmd_out;
+    logic        ex_csr_use_imm_out;
+    logic        ex_csr_read_out;
+    logic        ex_csr_write_out;
+
     // Registros ID/EX con lógica de stall y flush que pasan las señales desde ID hacia EX (y también hacia MEM y WB para las señales que necesitan llegar hasta esas etapas)
     id_ex_reg u_id_ex_reg (
         .clk                 (clk),
@@ -381,6 +452,16 @@ module core_top #(
         .id_load_unsigned_in(id_load_unsigned),
         .id_wb_sel_mem_in   (id_wb_sel_mem),
 
+        .id_csr_en_in      (id_csr_en),
+        .id_csr_cmd_in     (id_csr_cmd),
+        .id_csr_use_imm_in (id_csr_use_imm),
+        .id_csr_read_in    (id_csr_read),
+        .id_csr_write_in   (id_csr_write),
+
+        .id_sys_ecall_in    (id_sys_ecall),
+        .id_sys_ebreak_in   (id_sys_ebreak),
+        .id_sys_mret_in     (id_sys_mret),
+
         // Señales de control adicionales para load/store que se pasan desde ID hacia EX (y también hacia MEM y WB para las señales que necesitan llegar hasta esas etapas)
         .ex_valid_out        (ex_valid_out),
         .ex_pc_out           (ex_pc_out),
@@ -412,7 +493,17 @@ module core_top #(
         .ex_mem_read_out      (ex_mem_read_out),
         .ex_load_size_out     (ex_load_size_out),
         .ex_load_unsigned_out (ex_load_unsigned_out),
-        .ex_wb_sel_mem_out    (ex_wb_sel_mem_out)
+        .ex_wb_sel_mem_out    (ex_wb_sel_mem_out),
+
+        .ex_csr_en_out       (ex_csr_en_out),
+        .ex_csr_cmd_out      (ex_csr_cmd_out),
+        .ex_csr_use_imm_out  (ex_csr_use_imm_out),
+        .ex_csr_read_out     (ex_csr_read_out),
+        .ex_csr_write_out    (ex_csr_write_out),
+
+        .ex_sys_ecall_out   (ex_sys_ecall_out),
+        .ex_sys_ebreak_out  (ex_sys_ebreak_out),
+        .ex_sys_mret_out    (ex_sys_mret_out)
     );
 
 
@@ -437,6 +528,20 @@ module core_top #(
     logic [63:0] ex_redirect_target;
     logic        ex_take_pc_redirect;
     logic        ex_is_jalr;
+
+    // Señales de control adicionales para traps y redirecciones desde EX
+    logic        ex_target_misaligned;
+    logic        ex_sync_trap;
+    logic        ex_mret_redirect;
+    logic [63:0] ex_trap_cause;
+
+    // Señales para operaciones con CSR en EX
+    logic [11:0] ex_csr_addr;
+    logic [63:0] ex_csr_wdata;
+    logic [63:0] ex_csr_rdata;
+    logic        ex_csr_illegal_access;
+    logic        ex_effective_illegal_instr;
+    logic [63:0] ex_result_to_pipe;
 
     // Mux para operando A de ALU (selecciona entre rs1, pc o cero)
     always_comb begin
@@ -488,18 +593,110 @@ module core_top #(
         ex_is_jalr ? {ex_alu_result[63:1], 1'b0} :   // Para instrucciones JALR, el target de redirección de PC se calcula como el resultado de la ALU (que corresponde a rs1 + inmediato), pero con el bit menos significativo forzado a cero para asegurar que la dirección sea par (requisito para instrucciones JALR)
                     ex_pc_out + ex_imm_out;           // Para instrucciones de branch y para JAL, el target de redirección de PC se calcula como PC + inmediato
 
+    // IALIGN=32 en esta implementación: toda redirección tomada debe quedar alineada a 4 bytes
+    assign ex_target_misaligned =
+        ex_take_pc_redirect &&
+        (ex_redirect_target[1:0] != 2'b00);
+
+    assign ex_csr_addr  = ex_instr_out[31:20];
+    assign ex_csr_wdata = ex_csr_use_imm_out ? {59'd0, ex_rs1_addr_out} : ex_rs1_fwd_data;
+
+    // Módulo de archivo de registros de control (CSR) que maneja las instrucciones CSR, incluyendo lectura y escritura de CSRs, generación de traps síncronos para accesos ilegales a CSRs, y manejo de redirecciones de PC para traps y MRET
+    // El módulo de CSR también expone las señales de salida de los CSRs relevantes (mtvec, mepc, mcause) para que puedan ser usados en la lógica de redirección de PC y en la generación de causa de trap en EX
+
+    csr_file #(
+        .RESET_MTVEC(TRAP_VECTOR)
+    ) u_csr_file (
+        .clk            (clk),
+        .rst            (rst),
+
+        .access_valid   (ex_valid_out && ex_csr_en_out && !ex_illegal_instr_out),
+        .access_addr    (ex_csr_addr),
+        .access_read_en (ex_csr_read_out),
+        .access_write_en(ex_csr_write_out),
+        .access_cmd     (ex_csr_cmd_out),
+        .access_wdata   (ex_csr_wdata),
+
+        .access_rdata   (ex_csr_rdata),
+        .access_illegal (ex_csr_illegal_access),
+
+        .trap_valid     (ex_sync_trap),
+        .trap_pc        (ex_pc_out),
+        .trap_cause     (ex_trap_cause),
+
+        .mret_valid     (ex_mret_redirect),
+
+        .mtvec_o        (csr_mtvec),
+        .mepc_o         (csr_mepc),
+        .mcause_o       (csr_mcause)
+    );
+    // La señal de instrucción ilegal efectiva en EX se genera combinando la señal de instrucción ilegal decodificada (que indica que la instrucción no es reconocida por el decoder) con la señal de acceso ilegal a CSR (que indica que se ha intentado acceder a un CSR de manera no permitida, por ejemplo, escribiendo a un CSR de solo lectura o leyendo un CSR que no existe)
+    assign ex_effective_illegal_instr =
+        ex_illegal_instr_out ||
+        (ex_valid_out && ex_csr_en_out && ex_csr_illegal_access);
+    // El resultado que se pasa hacia MEM/WB desde EX para instrucciones que escriben en rd (ya sea el resultado de la ALU o el dato leído desde un CSR, dependiendo del tipo de instrucción) se selecciona entre el resultado de la ALU o el dato leído desde el CSR en función de si la instrucción es una instrucción CSR o no (controlado por ex_csr_en_out)
+    assign ex_result_to_pipe =
+        ex_csr_en_out ? ex_csr_rdata : ex_alu_result;
+
+    // Cálculo de causa de trap en EX para instrucciones ilegales, redirecciones de PC con target no alineado, y ECALL/EBREAK válidos (que no sean ilegales)
+    always_comb begin
+        ex_trap_cause = 64'd0;
+
+        if (ex_effective_illegal_instr)
+            ex_trap_cause = MCAUSE_ILLEGAL_INSTR;
+        else if (ex_target_misaligned)
+            ex_trap_cause = MCAUSE_INSTR_ADDR_MISALIGNED;
+        else if (ex_sys_ecall_out)
+            ex_trap_cause = MCAUSE_ECALL_M;
+        else if (ex_sys_ebreak_out)
+            ex_trap_cause = MCAUSE_BREAKPOINT;
+    end
+
+    // Señal de trap síncrono que se genera en EX cuando se detecta una instrucción ilegal, una redirección de PC con target no alineado, o una instrucción ECALL/EBREAK válida (que no sea ilegal)
+    assign ex_sync_trap =
+        ex_valid_out &&
+        (
+            ex_effective_illegal_instr ||
+            ex_target_misaligned ||
+            ex_sys_ecall_out ||
+            ex_sys_ebreak_out
+        );
+
+    // Señal de redirección de PC específica para MRET, que se genera en EX cuando se detecta una instrucción MRET válida (que no sea ilegal) y que se usa para indicar que el target de redirección de PC para MRET debe ser el valor de mepc (en lugar del target calculado para branches/jumps)
+    assign ex_mret_redirect =
+        ex_valid_out &&
+        ex_sys_mret_out &&
+        !ex_effective_illegal_instr;
+
     // Redirección de PC resuelta en EX (para ramas tomadas o saltos) que genera un flush hacia IF/ID e ID/EX para eliminar las instrucciones que se hayan podido fetchar o decodificar incorrectamente debido a la redirección de PC
-    assign if_id_flush = ex_take_pc_redirect;   // Si se toma la redirección de PC, se hace flush hacia IF/ID para eliminar la instrucción que se haya podido fetchar incorrectamente
-    assign id_ex_flush = ex_take_pc_redirect || load_use_hazard;   // Si se toma la redirección de PC, se hace flush hacia ID/EX para eliminar la instrucción que se haya podido decodificar incorrectamente; además, si hay un hazard de tipo load-use, también se hace flush hacia ID/EX para eliminar la instrucción que está causando el hazard y que no debería ejecutarse
+    assign if_id_flush =
+        ex_sync_trap ||
+        ex_mret_redirect ||
+        ex_take_pc_redirect;
+
+    assign id_ex_flush =
+        ex_sync_trap ||
+        ex_mret_redirect ||
+        ex_take_pc_redirect ||
+        load_use_hazard;
+
+    // En trap o MRET no queremos que la instrucción actual llegue a MEM/WB
+    assign ex_mem_flush =
+        ex_sync_trap ||
+        ex_mret_redirect;   // Si se toma la redirección de PC, se hace flush hacia ID/EX para eliminar la instrucción que se haya podido decodificar incorrectamente; además, si hay un hazard de tipo load-use, también se hace flush hacia ID/EX para eliminar la instrucción que está causando el hazard y que no debería ejecutarse
 
     // =========================================================
     // PC register con lógica de actualización basada en redirección de PC desde EX y cálculo de PC + 4 en IF 
     // =========================================================
     always_comb begin
-        if (ex_take_pc_redirect)            // Si se toma la redirección de PC, el siguiente valor del PC es el target calculado en EX
-            pc_next = ex_redirect_target;   // Si no se toma la redirección de PC, el siguiente valor del PC es el PC + 4 calculado en IF
+        if (ex_sync_trap)
+            pc_next = {csr_mtvec[63:2], 2'b00};
+        else if (ex_mret_redirect)
+            pc_next = {csr_mepc[63:2], 2'b00};
+        else if (ex_take_pc_redirect)
+            pc_next = ex_redirect_target;
         else
-            pc_next = pc_plus4_if;          // El siguiente valor del PC es el PC + 4 calculado en IF
+            pc_next = pc_plus4_if;
     end
 
     // Registro de PC que se actualiza en cada ciclo de reloj con el valor calculado en la lógica combinacional anterior, y que también se resetea al valor de RESET_PC cuando se activa el reset
@@ -548,7 +745,7 @@ module core_top #(
 
         .ex_rd_addr_in       (ex_rd_addr_out),
 
-        .ex_alu_result_in    (ex_alu_result),
+        .ex_alu_result_in    (ex_result_to_pipe),
         .ex_store_data_in    (ex_rs2_fwd_data),
         .ex_pc_plus4_in      (ex_pc_plus4),
 
@@ -779,6 +976,9 @@ module core_top #(
         1'b0,
         wb_pc_out,
         wb_instr_out,
+        csr_mcause,
+        csr_mtvec[1:0],
+        csr_mepc[1:0],
         1'b0
     };
 

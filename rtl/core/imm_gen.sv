@@ -26,4 +26,10 @@ module imm_gen (
         (imm_sel == IMM_J)    ? {{43{instr[31]}}, instr[31], instr[19:12], instr[20], instr[30:21], 1'b0} : // J-type
                                 64'd0;  // default (instrucción ilegal o IMM_NONE)
 
+    wire _unused_ok = 1'b0 && &{
+        1'b0,
+        instr[6:0],
+        1'b0
+    };
+
 endmodule

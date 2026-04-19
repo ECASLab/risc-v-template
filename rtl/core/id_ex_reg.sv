@@ -43,6 +43,16 @@ module id_ex_reg (
     input  logic        id_load_unsigned_in,
     input  logic        id_wb_sel_mem_in,
 
+    input  logic        id_csr_en_in,
+    input  logic [1:0]  id_csr_cmd_in,
+    input  logic        id_csr_use_imm_in,
+    input  logic        id_csr_read_in,
+    input  logic        id_csr_write_in,
+
+    input  logic        id_sys_ecall_in,
+    input  logic        id_sys_ebreak_in,
+    input  logic        id_sys_mret_in,
+
     // -----------------------------
     // Salidas hacia EX
     // -----------------------------
@@ -76,7 +86,17 @@ module id_ex_reg (
     output logic        ex_mem_read_out,
     output logic [1:0]  ex_load_size_out,
     output logic        ex_load_unsigned_out,
-    output logic        ex_wb_sel_mem_out
+    output logic        ex_wb_sel_mem_out,
+
+    output logic        ex_csr_en_out,
+    output logic [1:0]  ex_csr_cmd_out,
+    output logic        ex_csr_use_imm_out,
+    output logic        ex_csr_read_out,
+    output logic        ex_csr_write_out,
+
+    output logic        ex_sys_ecall_out,
+    output logic        ex_sys_ebreak_out,
+    output logic        ex_sys_mret_out
 );
 
     always_ff @(posedge clk) begin
@@ -112,6 +132,16 @@ module id_ex_reg (
             ex_load_size_out     <= 2'b00;
             ex_load_unsigned_out <= 1'b0;
             ex_wb_sel_mem_out    <= 1'b0;
+
+            ex_csr_en_out       <= 1'b0;
+            ex_csr_cmd_out      <= 2'b00;
+            ex_csr_use_imm_out  <= 1'b0;
+            ex_csr_read_out     <= 1'b0;
+            ex_csr_write_out    <= 1'b0;
+
+            ex_sys_ecall_out    <= 1'b0;
+            ex_sys_ebreak_out   <= 1'b0;
+            ex_sys_mret_out     <= 1'b0;
         end
         else if (flush) begin
             // Inserta burbuja hacia EX
@@ -146,6 +176,16 @@ module id_ex_reg (
             ex_load_size_out     <= 2'b00;
             ex_load_unsigned_out <= 1'b0;
             ex_wb_sel_mem_out    <= 1'b0;
+
+            ex_csr_en_out       <= 1'b0;
+            ex_csr_cmd_out      <= 2'b00;
+            ex_csr_use_imm_out  <= 1'b0;
+            ex_csr_read_out     <= 1'b0;
+            ex_csr_write_out    <= 1'b0;
+
+            ex_sys_ecall_out    <= 1'b0;
+            ex_sys_ebreak_out   <= 1'b0;
+            ex_sys_mret_out     <= 1'b0;
         end
         else if (stall) begin
             // Mantener el contenido actual
@@ -182,6 +222,16 @@ module id_ex_reg (
             ex_load_size_out     <= id_load_size_in;
             ex_load_unsigned_out <= id_load_unsigned_in;
             ex_wb_sel_mem_out    <= id_wb_sel_mem_in;
+
+            ex_csr_en_out       <= id_csr_en_in;
+            ex_csr_cmd_out      <= id_csr_cmd_in;
+            ex_csr_use_imm_out  <= id_csr_use_imm_in;
+            ex_csr_read_out     <= id_csr_read_in;
+            ex_csr_write_out    <= id_csr_write_in;
+
+            ex_sys_ecall_out    <= id_sys_ecall_in;
+            ex_sys_ebreak_out   <= id_sys_ebreak_in;
+            ex_sys_mret_out     <= id_sys_mret_in;
         end
     end
 

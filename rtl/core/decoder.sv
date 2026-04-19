@@ -20,6 +20,12 @@ module decoder (
     output logic        load_unsigned,
     output logic        wb_sel_mem,
 
+    output logic        csr_en,
+    output logic [1:0]  csr_cmd,
+    output logic        csr_use_imm,
+    output logic        csr_read,
+    output logic        csr_write,
+
     output logic        rs1_used,
     output logic        rs2_used,
 
@@ -33,7 +39,12 @@ module decoder (
     output logic [2:0]  branch_op,
     output logic        jump,
 
-    output logic        illegal_instr
+    output logic        illegal_instr,
+
+    // Señales para instrucciones de sistema (ECALL, EBREAK, MRET)
+    output logic        sys_ecall,
+    output logic        sys_ebreak,
+    output logic        sys_mret
 );
 
     // -----------------------------
@@ -128,6 +139,20 @@ module decoder (
     localparam logic [6:0] OPCODE_BRANCH    = 7'b1100011;
     localparam logic [6:0] OPCODE_STORE     = 7'b0100011;
     localparam logic [6:0] OPCODE_LOAD      = 7'b0000011;
+    localparam logic [6:0] OPCODE_MISC_MEM  = 7'b0001111;   // No se decodifican instrucciones de esta categoría, pero se podría usar para FENCE/FENCE.I
+    localparam logic [6:0] OPCODE_SYSTEM    = 7'b1110011;   // ECALL, EBREAK, MRET, etc.
+
+    // -----------------------------
+    // Comandos CSR
+    // 00 = none
+    // 01 = RW
+    // 10 = RS
+    // 11 = RC
+    // -----------------------------    
+    localparam logic [1:0] CSR_CMD_NONE = 2'b00;
+    localparam logic [1:0] CSR_CMD_RW   = 2'b01;
+    localparam logic [1:0] CSR_CMD_RS   = 2'b10;
+    localparam logic [1:0] CSR_CMD_RC   = 2'b11;
 
     always_comb begin
         // -------------------------
@@ -157,6 +182,18 @@ module decoder (
         jump          = 1'b0;
 
         illegal_instr = 1'b0;
+
+        // Por defecto, no se decodifican instrucciones de sistema
+        sys_ecall    = 1'b0;
+        sys_ebreak   = 1'b0;
+        sys_mret     = 1'b0;
+
+        // Por defecto, no se decodifican instrucciones CSR
+        csr_en        = 1'b0;
+        csr_cmd       = CSR_CMD_NONE;
+        csr_use_imm   = 1'b0;
+        csr_read      = 1'b0;
+        csr_write     = 1'b0;
 
         case (opcode) // Se decodifica el opcode para determinar el tipo de instrucción y configurar las señales de control correspondientes
 
@@ -518,6 +555,118 @@ module decoder (
                         illegal_instr = 1'b1;
                     end
                 endcase
+            end
+
+            // ---------------------------------
+            // MISC-MEM
+            // Por ahora solo aceptamos FENCE base como no-op.
+            // FENCE.I se deja fuera en esta iteración.
+            // ---------------------------------
+            OPCODE_MISC_MEM: begin
+                if (funct3 == 3'b000) begin
+                    // FENCE base: implementación mínima = no-op arquitectónico
+                end
+                else begin
+                    // FENCE.I y otros no soportados en esta iteración
+                    illegal_instr = 1'b1;
+                end
+            end
+
+            // ---------------------------------
+            // SYSTEM
+            // Soporta:
+            //   ECALL, EBREAK, MRET
+            //   CSRRW / CSRRS / CSRRC
+            //   CSRRWI / CSRRSI / CSRRCI
+            // ---------------------------------
+            OPCODE_SYSTEM: begin
+                if (funct3 == 3'b000) begin
+                    if (instr == 32'h00000073) begin
+                        sys_ecall = 1'b1;   // ECALL
+                    end
+                    else if (instr == 32'h00100073) begin
+                        sys_ebreak = 1'b1;  // EBREAK
+                    end
+                    else if (instr == 32'h30200073) begin
+                        sys_mret = 1'b1;    // MRET
+                    end
+                    else begin
+                        illegal_instr = 1'b1;
+                    end
+                end
+                else begin
+                    csr_en = 1'b1;
+
+                    // Para CSR, el resultado que va a rd será el valor viejo del CSR
+                    // si y solo si rd != x0.
+                    reg_write = (rd_addr != 5'd0);
+
+                    case (funct3)
+                        3'b001: begin
+                            // CSRRW
+                            csr_cmd     = CSR_CMD_RW;
+                            csr_use_imm = 1'b0;
+                            csr_read    = (rd_addr != 5'd0);
+                            csr_write   = 1'b1;
+                            rs1_used    = (rs1_addr != 5'd0);
+                        end
+
+                        3'b010: begin
+                            // CSRRS
+                            csr_cmd     = CSR_CMD_RS;
+                            csr_use_imm = 1'b0;
+                            csr_read    = 1'b1;
+                            csr_write   = (rs1_addr != 5'd0);
+                            rs1_used    = (rs1_addr != 5'd0);
+                        end
+
+                        3'b011: begin
+                            // CSRRC
+                            csr_cmd     = CSR_CMD_RC;
+                            csr_use_imm = 1'b0;
+                            csr_read    = 1'b1;
+                            csr_write   = (rs1_addr != 5'd0);
+                            rs1_used    = (rs1_addr != 5'd0);
+                        end
+
+                        3'b101: begin
+                            // CSRRWI
+                            csr_cmd     = CSR_CMD_RW;
+                            csr_use_imm = 1'b1;
+                            csr_read    = (rd_addr != 5'd0);
+                            csr_write   = 1'b1;
+                            rs1_used    = 1'b0; // rs1 field es uimm
+                        end
+
+                        3'b110: begin
+                            // CSRRSI
+                            csr_cmd     = CSR_CMD_RS;
+                            csr_use_imm = 1'b1;
+                            csr_read    = 1'b1;
+                            csr_write   = (rs1_addr != 5'd0); // uimm != 0
+                            rs1_used    = 1'b0;
+                        end
+
+                        3'b111: begin
+                            // CSRRCI
+                            csr_cmd     = CSR_CMD_RC;
+                            csr_use_imm = 1'b1;
+                            csr_read    = 1'b1;
+                            csr_write   = (rs1_addr != 5'd0); // uimm != 0
+                            rs1_used    = 1'b0;
+                        end
+
+                        default: begin
+                            csr_en        = 1'b0;
+                            reg_write     = 1'b0;
+                            csr_cmd       = CSR_CMD_NONE;
+                            csr_use_imm   = 1'b0;
+                            csr_read      = 1'b0;
+                            csr_write     = 1'b0;
+                            illegal_instr = 1'b1;
+                        end
+                    endcase
+                end
             end
 
             default: begin
