@@ -15,19 +15,44 @@ module tb_core_directed;
     logic [63:0] dmem_wdata;//Dato a escribir en DMEM
     logic [1:0]  dmem_size;//Tamaño de la operación de memoria
 
+    // ------------------------------------------------------------
+    // Señales dummy para puerto de expansión.
+    // Estos testbenches no usan MMIO, por eso el puerto se deja
+    // en estado inactivo/seguro para evitar entradas flotantes.
+    // ------------------------------------------------------------
+    logic        exp_ready;
+    logic [63:0] exp_rdata;
+    logic        exp_error;
+
+    assign exp_ready = 1'b1;
+    assign exp_rdata = 64'd0;
+    assign exp_error = 1'b0;
+
     core_top #(
         .RESET_PC(64'd0)
     ) dut (
-        .clk       (clk),
-        .rst       (rst),
-        .imem_addr (imem_addr),
-        .imem_rdata(imem_rdata),
-        .dmem_rdata(dmem_rdata),
-        .dmem_we   (dmem_we),
-        .dmem_wstrb(dmem_wstrb),
-        .dmem_addr (dmem_addr),
-        .dmem_wdata(dmem_wdata),
-        .dmem_size (dmem_size)
+        .clk        (clk),
+        .rst        (rst),
+
+        .imem_addr  (imem_addr),
+        .imem_rdata (imem_rdata),
+
+        .dmem_rdata (dmem_rdata),
+        .dmem_we    (dmem_we),
+        .dmem_wstrb (dmem_wstrb),
+        .dmem_addr  (dmem_addr),
+        .dmem_wdata (dmem_wdata),
+        .dmem_size  (dmem_size),
+
+        .exp_valid  (),
+        .exp_we     (),
+        .exp_addr   (),
+        .exp_wdata  (),
+        .exp_wstrb  (),
+        .exp_size   (),
+        .exp_ready  (exp_ready),
+        .exp_rdata  (exp_rdata),
+        .exp_error  (exp_error)
     );
 
     // -------------------------------------------------

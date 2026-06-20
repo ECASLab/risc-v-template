@@ -39,6 +39,14 @@ module csr_file #(
     localparam logic [11:0] CSR_MEPC    = 12'h341;
     localparam logic [11:0] CSR_MCAUSE  = 12'h342;
 
+    // CSRs de identificación de máquina.
+    // Se exponen como lectura válida para mejorar compatibilidad con pruebas
+    // arquitecturales y software bare-metal mínimo.
+    localparam logic [11:0] CSR_MVENDORID = 12'hF11;
+    localparam logic [11:0] CSR_MARCHID   = 12'hF12;
+    localparam logic [11:0] CSR_MIMPID    = 12'hF13;
+    localparam logic [11:0] CSR_MHARTID   = 12'hF14;
+
     // ---------------------------------------------------------
     // Comandos CSR
     // 00 = none
@@ -54,12 +62,10 @@ module csr_file #(
     // misa fija de esta implementación
     // MXL = 2 -> RV64
     // I = bit 8
-    // Z = bit 25 (para indicar presencia de extensiones tipo Z; aquí Zicsr)
     // ---------------------------------------------------------
     localparam logic [63:0] MISA_RESET_VALUE =
         (64'h2 << 62) |
-        (64'h1 << 8)  |
-        (64'h1 << 25);
+        (64'h1 << 8);
 
     // ---------------------------------------------------------
     // Registros internos
@@ -109,6 +115,13 @@ module csr_file #(
             CSR_MTVEC:   selected_csr_value = mtvec_r;
             CSR_MEPC:    selected_csr_value = mepc_r;
             CSR_MCAUSE:  selected_csr_value = mcause_r;
+
+            // CSRs de identificación.
+            // Valores mínimos válidos para un núcleo académico de un solo hart.
+            CSR_MVENDORID: selected_csr_value = 64'd0;
+            CSR_MARCHID:   selected_csr_value = 64'd0;
+            CSR_MIMPID:    selected_csr_value = 64'd0;
+            CSR_MHARTID:   selected_csr_value = 64'd0;
             default: begin
                 selected_csr_value  = 64'd0;
                 selected_csr_exists = 1'b0;
@@ -123,8 +136,27 @@ module csr_file #(
         access_rdata   = selected_csr_value;
         access_illegal = 1'b0;
 
-        if (access_valid && (access_read_en || access_write_en) && !selected_csr_exists)
+        if (access_valid && (access_read_en || access_write_en) && !selected_csr_exists) begin
             access_illegal = 1'b1;
+        end
+
+        // CSRs de identificación: lectura permitida, escritura ilegal.
+        // Esto evita que CSRRW/CSRRWI modifiquen registros que deben comportarse
+        // como read-only en esta implementación mínima.
+        if (access_valid && access_write_en) begin
+            case (access_addr)
+                CSR_MVENDORID,
+                CSR_MARCHID,
+                CSR_MIMPID,
+                CSR_MHARTID: begin
+                    access_illegal = 1'b1;
+                end
+
+                default: begin
+                    // Sin cambio.
+                end
+            endcase
+        end
     end
 
     // ---------------------------------------------------------
@@ -176,7 +208,10 @@ module csr_file #(
                 CSR_MSTATUS: begin
                     mstatus_mie_r  <= write_value[3];
                     mstatus_mpie_r <= write_value[7];
-                    mstatus_mpp_r  <= write_value[12:11];
+
+                    // Implementación mínima solo M-mode.
+                    // No permitimos que software escriba U/S/H en MPP.
+                    mstatus_mpp_r  <= 2'b11;
                 end
 
                 CSR_MISA: begin

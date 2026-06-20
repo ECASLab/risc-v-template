@@ -2,7 +2,12 @@
 
 module core_top #(
     parameter logic [63:0] RESET_PC = 64'd0,
-    parameter logic [63:0] TRAP_VECTOR = 64'h0000_0000_0000_0100
+    parameter logic [63:0] TRAP_VECTOR = 64'h0000_0000_0000_0100,
+
+    // Región MMIO reservada para el puerto de expansión.
+    // Por defecto: 0x0000_0000_8000_0000 - 0x0000_0000_8000_0FFF
+    parameter logic [63:0] EXP_BASE = 64'h0000_0000_8000_0000,
+    parameter logic [63:0] EXP_MASK = 64'hFFFF_FFFF_FFFF_F000
 ) (
     input  logic        clk,    // reloj del core
     input  logic        rst,    // reset síncrono del core
@@ -21,7 +26,20 @@ module core_top #(
     output logic [7:0]  dmem_wstrb,  // byte enables para la operación de store (calculados a partir de dmem_size y dmem_addr)
     output logic [63:0] dmem_addr,  // dirección de la operación de memoria (load/store)
     output logic [63:0] dmem_wdata, // dato a escribir en caso de store
-    output logic [1:0]  dmem_size   // tamaño de la operación de memoria (00=byte, 01=halfword, 10=word, 11=doubleword)
+    output logic [1:0]  dmem_size,   // tamaño de la operación de memoria (00=byte, 01=halfword, 10=word, 11=doubleword)
+
+    // -----------------------------
+    // Expansion MMIO interface
+    // -----------------------------
+    output logic        exp_valid,  // acceso válido hacia región de expansión
+    output logic        exp_we,     // 1=store, 0=load
+    output logic [63:0] exp_addr,   // dirección efectiva completa
+    output logic [63:0] exp_wdata,  // dato de escritura alineado por byte lane
+    output logic [7:0]  exp_wstrb,  // byte enables
+    output logic [1:0]  exp_size,   // tamaño del acceso
+    input  logic        exp_ready,  // reservado para wait-states futuros
+    input  logic [63:0] exp_rdata,  // dato leído desde periférico/acelerador
+    input  logic        exp_error   // reservado para traps de memoria futuros
 );
 
 
@@ -48,6 +66,8 @@ module core_top #(
     localparam logic [63:0] MCAUSE_INSTR_ADDR_MISALIGNED = 64'd0;
     localparam logic [63:0] MCAUSE_ILLEGAL_INSTR         = 64'd2;
     localparam logic [63:0] MCAUSE_BREAKPOINT            = 64'd3;
+    localparam logic [63:0] MCAUSE_LOAD_ACCESS_FAULT     = 64'd5;
+    localparam logic [63:0] MCAUSE_STORE_ACCESS_FAULT    = 64'd7;
     localparam logic [63:0] MCAUSE_ECALL_M               = 64'd11;
 
 
@@ -88,6 +108,28 @@ module core_top #(
     logic mem_wb_stall;
     logic mem_wb_flush;
 
+    // Redirección de control con prioridad sobre stalls de datos.
+    // Incluye traps, MRET y branches/jumps tomados.
+    logic control_redirect;
+
+    // Stall efectivo por load-use.
+    // Si hay redirección de control, no se debe congelar el PC.
+    logic data_hazard_stall;
+    logic mem_exp_wait_stall;
+    logic pipeline_stall;
+
+    // Trap detectado en etapa MEM.
+    // Se usa para convertir errores del puerto de expansión en excepciones
+    // arquitecturales de load/store access fault.
+    logic        mem_sync_trap;
+    logic [63:0] mem_trap_cause;
+
+    // Trap finalmente tomado por el core.
+    // MEM tiene prioridad sobre EX porque la instrucción en MEM es más antigua.
+    logic        trap_taken_valid;
+    logic [63:0] trap_taken_pc;
+    logic [63:0] trap_taken_cause;
+
     // Lógica de generación de señales de stall y flush (por ahora solo se implementa el hazard de tipo load-use con un stall hacia IF/ID, el resto de señales se dejan en 0 para no tener stalls ni flushes adicionales)
     assign load_use_hazard =
         id_valid_out &&
@@ -100,14 +142,29 @@ module core_top #(
             (id_rs2_used && (id_rs2_addr == ex_rd_addr_out))
         );
 
-    assign if_id_stall  = load_use_hazard;      // Si hay un hazard de tipo load-use, se hace stall hacia IF/ID para esperar a que el dato cargado esté disponible en EX/MEM
-    assign id_ex_stall  = 1'b0;
-    assign ex_mem_stall = 1'b0;
-    assign mem_wb_stall = 1'b0;
+    // data_hazard_stall conserva el caso clásico load-use.
+    // Si MEM está esperando un periférico/AXI, el stall global tiene prioridad
+    // y no se debe insertar una burbuja nueva en ID/EX.
+    assign data_hazard_stall =
+        load_use_hazard &&
+        !control_redirect &&
+        !mem_exp_wait_stall;
 
-    assign mem_wb_flush = 1'b0; // El flush hacia MEM/WB se controla desde ID/EX (por ahora no hay flushes específicos para MEM/WB)
+    // Stall global del pipeline.
+    // Se activa por:
+    // - load-use: congela PC e IF/ID, e inserta burbuja en ID/EX.
+    // - espera MMIO/exp: congela todas las etapas hasta que exp_ready=1.
+    assign pipeline_stall =
+        mem_exp_wait_stall ||
+        data_hazard_stall;
 
+    assign if_id_stall  = pipeline_stall;
+    assign id_ex_stall  = mem_exp_wait_stall;
+    assign ex_mem_stall = mem_exp_wait_stall;
+    assign mem_wb_stall = mem_exp_wait_stall;
 
+    // Si el trap se detecta en MEM, la instrucción causante no debe llegar a WB.
+    assign mem_wb_flush = mem_sync_trap;
 
     // =========================================================
     // IF/ID
@@ -620,11 +677,13 @@ module core_top #(
         .access_rdata   (ex_csr_rdata),
         .access_illegal (ex_csr_illegal_access),
 
-        .trap_valid     (ex_sync_trap),
-        .trap_pc        (ex_pc_out),
-        .trap_cause     (ex_trap_cause),
+        .trap_valid     (trap_taken_valid),
+        .trap_pc        (trap_taken_pc),
+        .trap_cause     (trap_taken_cause),
 
-        .mret_valid     (ex_mret_redirect),
+        // Si hay trap más antiguo en MEM, no permitimos que un MRET más joven
+        // en EX modifique el estado de CSRs en el mismo ciclo.
+        .mret_valid     (ex_mret_redirect && !mem_sync_trap),
 
         .mtvec_o        (csr_mtvec),
         .mepc_o         (csr_mepc),
@@ -669,30 +728,45 @@ module core_top #(
         !ex_effective_illegal_instr;
 
     // Redirección de PC resuelta en EX (para ramas tomadas o saltos) que genera un flush hacia IF/ID e ID/EX para eliminar las instrucciones que se hayan podido fetchar o decodificar incorrectamente debido a la redirección de PC
-    assign if_id_flush =
-        ex_sync_trap ||
-        ex_mret_redirect ||
-        ex_take_pc_redirect;
+    // Mientras una instrucción más antigua espera en MEM por exp_ready,
+    // no se permite que una instrucción más joven en EX redirija el PC.
+    assign control_redirect =
+        trap_taken_valid ||
+        (
+            !mem_exp_wait_stall &&
+            (
+                ex_mret_redirect ||
+                ex_take_pc_redirect
+            )
+        );
+
+    assign if_id_flush = control_redirect;
 
     assign id_ex_flush =
-        ex_sync_trap ||
-        ex_mret_redirect ||
-        ex_take_pc_redirect ||
-        load_use_hazard;
+        control_redirect ||
+        data_hazard_stall;
 
-    // En trap o MRET no queremos que la instrucción actual llegue a MEM/WB
+    // Si el trap viene desde MEM, también hay que eliminar la instrucción
+    // más joven que está en EX para que no avance a MEM.
     assign ex_mem_flush =
-        ex_sync_trap ||
-        ex_mret_redirect;   // Si se toma la redirección de PC, se hace flush hacia ID/EX para eliminar la instrucción que se haya podido decodificar incorrectamente; además, si hay un hazard de tipo load-use, también se hace flush hacia ID/EX para eliminar la instrucción que está causando el hazard y que no debería ejecutarse
+        trap_taken_valid ||
+        (!mem_exp_wait_stall && ex_mret_redirect);
 
     // =========================================================
     // PC register con lógica de actualización basada en redirección de PC desde EX y cálculo de PC + 4 en IF 
     // =========================================================
+    
+    logic [63:0] csr_mtvec_aligned;
+    logic [63:0] csr_mepc_aligned;
+
+    assign csr_mtvec_aligned = {csr_mtvec[63:2], 2'b00};
+    assign csr_mepc_aligned  = {csr_mepc[63:2],  2'b00};
+    
     always_comb begin
-        if (ex_sync_trap)
-            pc_next = {csr_mtvec[63:2], 2'b00};
+        if (trap_taken_valid)
+            pc_next = csr_mtvec_aligned;
         else if (ex_mret_redirect)
-            pc_next = {csr_mepc[63:2], 2'b00};
+            pc_next = csr_mepc_aligned;
         else if (ex_take_pc_redirect)
             pc_next = ex_redirect_target;
         else
@@ -701,10 +775,12 @@ module core_top #(
 
     // Registro de PC que se actualiza en cada ciclo de reloj con el valor calculado en la lógica combinacional anterior, y que también se resetea al valor de RESET_PC cuando se activa el reset
     always_ff @(posedge clk) begin
-        if (rst)                    // Si se activa el reset, el PC se resetea al valor de RESET_PC
+        if (rst) begin
             pc_reg <= RESET_PC;
-        else if (!load_use_hazard)
-            pc_reg <= pc_next;      // En cada ciclo de reloj, el PC se actualiza con el valor calculado en la lógica combinacional anterior
+        end
+        else if (!pipeline_stall) begin
+            pc_reg <= pc_next;
+        end
     end
 
     // =========================================================
@@ -797,46 +873,177 @@ module core_top #(
     logic [63:0] mem_store_wdata_aligned;
     logic [7:0]  mem_store_wstrb;
 
-    assign mem_rdata_shifted = dmem_rdata >> (8 * mem_alu_result_out[2:0]);
+    logic        mem_access_active;
+    logic        mem_is_exp_region;
+    logic        mem_is_exp_access;
+    logic        mem_is_dmem_access;
+    logic [63:0] mem_selected_rdata;
+
+    logic [2:0]  mem_addr_offset;
+    logic [5:0]  mem_shift_bits;
+
+    logic [7:0]  mem_load_byte;
+    logic [15:0] mem_load_half;
+    logic [31:0] mem_load_word;
+
+    logic [63:0] mem_load_byte_unsigned_data;
+    logic [63:0] mem_load_byte_signed_data;
+    logic [63:0] mem_load_half_unsigned_data;
+    logic [63:0] mem_load_half_signed_data;
+    logic [63:0] mem_load_word_unsigned_data;
+    logic [63:0] mem_load_word_signed_data;
+
+    logic [7:0]  mem_store_byte_wstrb;
+    logic [7:0]  mem_store_half_wstrb;
+    logic [7:0]  mem_store_word_wstrb;
+
+    logic [63:0] mem_store_byte_data_aligned;
+    logic [63:0] mem_store_half_data_aligned;
+    logic [63:0] mem_store_word_data_aligned;
+
+    assign mem_addr_offset = mem_alu_result_out[2:0];
+    assign mem_shift_bits  = {mem_addr_offset, 3'b000};
+
+    // Decodificación de región de expansión.
+    // mem_access_active solo se activa para loads/stores válidos que llegaron a MEM.
+    assign mem_access_active =
+        mem_valid_out &&
+        (mem_mem_read_out || mem_mem_write_out) &&
+        !mem_illegal_instr_out;
+
+    assign mem_is_exp_region =
+        ((mem_alu_result_out & EXP_MASK) == (EXP_BASE & EXP_MASK));
+
+    assign mem_is_exp_access =
+        mem_access_active && mem_is_exp_region;
+
+    assign mem_is_dmem_access =
+        mem_access_active && !mem_is_exp_region;
+
+    // Un error reportado por el periférico de expansión se convierte en
+    // excepción arquitectural. La instrucción causante está en MEM, por lo
+    // que mepc debe recibir mem_pc_out.
+    // Si el acceso MMIO todavía no terminó, exp_error/exp_rdata no se consideran válidos.
+    assign mem_exp_wait_stall =
+        mem_is_exp_access &&
+        !exp_ready;
+
+    assign mem_sync_trap =
+        mem_is_exp_access &&
+        exp_ready &&
+        exp_error;
+
+    always_comb begin
+        mem_trap_cause = 64'd0;
+
+        if (mem_mem_read_out) begin
+            mem_trap_cause = MCAUSE_LOAD_ACCESS_FAULT;
+        end
+        else if (mem_mem_write_out) begin
+            mem_trap_cause = MCAUSE_STORE_ACCESS_FAULT;
+        end
+    end
+
+    // MEM tiene prioridad sobre EX. Además, mientras MEM espera exp_ready,
+    // no se permite tomar traps más jóvenes desde EX.
+    assign trap_taken_valid =
+        mem_sync_trap ||
+        (!mem_exp_wait_stall && ex_sync_trap);
+
+    assign trap_taken_pc =
+        mem_sync_trap ? mem_pc_out : ex_pc_out;
+
+    assign trap_taken_cause =
+        mem_sync_trap ? mem_trap_cause : ex_trap_cause;
+
+    // Para loads, el dato puede venir de memoria normal o del puerto de expansión.
+    assign mem_selected_rdata =
+        mem_is_exp_access ? exp_rdata : dmem_rdata;
+
+    assign mem_rdata_shifted = mem_selected_rdata >> mem_shift_bits;
+
+    assign mem_load_byte = mem_rdata_shifted[7:0];
+    assign mem_load_half = mem_rdata_shifted[15:0];
+    assign mem_load_word = mem_rdata_shifted[31:0];
+
+    assign mem_load_byte_unsigned_data = {56'd0, mem_load_byte};
+    assign mem_load_byte_signed_data   = {{56{mem_load_byte[7]}}, mem_load_byte};
+
+    assign mem_load_half_unsigned_data = {48'd0, mem_load_half};
+    assign mem_load_half_signed_data   = {{48{mem_load_half[15]}}, mem_load_half};
+
+    assign mem_load_word_unsigned_data = {32'd0, mem_load_word};
+    assign mem_load_word_signed_data   = {{32{mem_load_word[31]}}, mem_load_word};
+
+    assign mem_store_byte_wstrb = 8'b00000001 << mem_addr_offset;
+    assign mem_store_half_wstrb = 8'b00000011 << mem_addr_offset;
+    assign mem_store_word_wstrb = 8'b00001111 << mem_addr_offset;
+
+    assign mem_store_byte_data_aligned = {56'd0, mem_store_data_out[7:0]}  << mem_shift_bits;
+    assign mem_store_half_data_aligned = {48'd0, mem_store_data_out[15:0]} << mem_shift_bits;
+    assign mem_store_word_data_aligned = {32'd0, mem_store_data_out[31:0]} << mem_shift_bits;
 
     always_comb begin
         case (mem_store_size_out)
-            2'b00: mem_store_wstrb = 8'b00000001 << mem_alu_result_out[2:0];
-            2'b01: mem_store_wstrb = 8'b00000011 << mem_alu_result_out[2:0];
-            2'b10: mem_store_wstrb = 8'b00001111 << mem_alu_result_out[2:0];
+            2'b00:   mem_store_wstrb = mem_store_byte_wstrb;
+            2'b01:   mem_store_wstrb = mem_store_half_wstrb;
+            2'b10:   mem_store_wstrb = mem_store_word_wstrb;
             default: mem_store_wstrb = 8'b11111111;
         endcase
 
         case (mem_store_size_out)
-            2'b00: mem_store_wdata_aligned = ({56'd0, mem_store_data_out[7:0]})   << (8 * mem_alu_result_out[2:0]);
-            2'b01: mem_store_wdata_aligned = ({48'd0, mem_store_data_out[15:0]})  << (8 * mem_alu_result_out[2:0]);
-            2'b10: mem_store_wdata_aligned = ({32'd0, mem_store_data_out[31:0]})  << (8 * mem_alu_result_out[2:0]);
+            2'b00:   mem_store_wdata_aligned = mem_store_byte_data_aligned;
+            2'b01:   mem_store_wdata_aligned = mem_store_half_data_aligned;
+            2'b10:   mem_store_wdata_aligned = mem_store_word_data_aligned;
             default: mem_store_wdata_aligned = mem_store_data_out;
         endcase
 
         case (mem_load_size_out)
-            2'b00: mem_load_data = mem_load_unsigned_out
-                                   ? {56'd0, mem_rdata_shifted[7:0]}
-                                   : {{56{mem_rdata_shifted[7]}}, mem_rdata_shifted[7:0]};
+            2'b00: begin
+                mem_load_data = mem_load_unsigned_out
+                                ? mem_load_byte_unsigned_data
+                                : mem_load_byte_signed_data;
+            end
 
-            2'b01: mem_load_data = mem_load_unsigned_out
-                                   ? {48'd0, mem_rdata_shifted[15:0]}
-                                   : {{48{mem_rdata_shifted[15]}}, mem_rdata_shifted[15:0]};
+            2'b01: begin
+                mem_load_data = mem_load_unsigned_out
+                                ? mem_load_half_unsigned_data
+                                : mem_load_half_signed_data;
+            end
 
-            2'b10: mem_load_data = mem_load_unsigned_out
-                                   ? {32'd0, mem_rdata_shifted[31:0]}
-                                   : {{32{mem_rdata_shifted[31]}}, mem_rdata_shifted[31:0]};
+            2'b10: begin
+                mem_load_data = mem_load_unsigned_out
+                                ? mem_load_word_unsigned_data
+                                : mem_load_word_signed_data;
+            end
 
-            default: mem_load_data = mem_rdata_shifted; // LD
+            default: begin
+                mem_load_data = mem_rdata_shifted;
+            end
         endcase
     end
 
-    assign dmem_we    = mem_valid_out && mem_mem_write_out && !mem_illegal_instr_out;
+    assign dmem_we    = mem_is_dmem_access && mem_mem_write_out && !mem_sync_trap;
     assign dmem_addr  = mem_alu_result_out;
     assign dmem_wdata = mem_store_wdata_aligned;
     assign dmem_wstrb = dmem_we ? mem_store_wstrb : 8'b0;
-    assign dmem_size  = mem_mem_write_out ? mem_store_size_out :
-                        mem_mem_read_out  ? mem_load_size_out  : 2'b00;
+    assign dmem_size  = mem_is_dmem_access
+                        ? (mem_mem_write_out ? mem_store_size_out :
+                        mem_mem_read_out  ? mem_load_size_out  : 2'b00)
+                        : 2'b00;
+
+    // Para MMIO mantenemos exp_valid/exp_we activos durante el ciclo del acceso,
+    // incluso si exp_error sube. El periférico es quien reporta el error y debe
+    // evitar efectos internos no permitidos. El core convierte ese error en trap.
+    assign exp_valid = mem_is_exp_access;
+    assign exp_we    = mem_is_exp_access && mem_mem_write_out;
+    assign exp_addr  = mem_alu_result_out;
+    assign exp_wdata = mem_store_wdata_aligned;
+    assign exp_wstrb = exp_we ? mem_store_wstrb : 8'b0;
+    assign exp_size  = mem_is_exp_access
+                    ? (mem_mem_write_out ? mem_store_size_out :
+                        mem_mem_read_out  ? mem_load_size_out  : 2'b00)
+                    : 2'b00;
 
 
     // =========================================================
@@ -979,6 +1186,7 @@ module core_top #(
         csr_mcause,
         csr_mtvec[1:0],
         csr_mepc[1:0],
+        exp_ready,
         1'b0
     };
 

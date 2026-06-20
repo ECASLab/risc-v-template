@@ -21,6 +21,19 @@ module tb_core_jalr_misaligned_trap;
 
     logic [31:0] imem [0:255];
 
+    // ------------------------------------------------------------
+    // Señales dummy para puerto de expansión.
+    // Estos testbenches no usan MMIO, por eso el puerto se deja
+    // en estado inactivo/seguro para evitar entradas flotantes.
+    // ------------------------------------------------------------
+    logic        exp_ready;
+    logic [63:0] exp_rdata;
+    logic        exp_error;
+
+    assign exp_ready = 1'b1;
+    assign exp_rdata = 64'd0;
+    assign exp_error = 1'b0;
+
     integer i;
     integer cycle;
 
@@ -33,14 +46,26 @@ module tb_core_jalr_misaligned_trap;
     ) dut (
         .clk        (clk),
         .rst        (rst),
+
         .imem_addr  (imem_addr),
         .imem_rdata (imem_rdata),
+
         .dmem_rdata (dmem_rdata),
         .dmem_we    (dmem_we),
         .dmem_wstrb (dmem_wstrb),
         .dmem_addr  (dmem_addr),
         .dmem_wdata (dmem_wdata),
-        .dmem_size  (dmem_size)
+        .dmem_size  (dmem_size),
+
+        .exp_valid  (),
+        .exp_we     (),
+        .exp_addr   (),
+        .exp_wdata  (),
+        .exp_wstrb  (),
+        .exp_size   (),
+        .exp_ready  (exp_ready),
+        .exp_rdata  (exp_rdata),
+        .exp_error  (exp_error)
     );
 
     // =========================================================

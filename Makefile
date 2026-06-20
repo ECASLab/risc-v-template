@@ -1,135 +1,293 @@
-EVID_DIR := docs/verification
-LOG_DIR  := $(EVID_DIR)/logs
-DATE_STR ?= $(shell date +%F)
+# ============================================================
+# Makefile - RISC-V Core Project
+# Ubicación esperada:
+#   risc-v-template/Makefile
+#
+# Uso principal:
+#   make
+#   make regression
+#   make lint
+#   make clean
+#
+# Ejecutar una prueba específica:
+#   make tb_core_system_trap
+#   make run-one TB=tb_core_illegal_trap
+# ============================================================
 
-IVERILOG ?= iverilog
-VVP      ?= vvp
+SHELL := /bin/bash
+
+# Permite usar ">" en lugar de tab en las recetas.
+.RECIPEPREFIX := >
+
+# ------------------------------------------------------------
+# Herramientas
+# ------------------------------------------------------------
+
+IVERILOG  ?= iverilog
+VVP       ?= vvp
 VERILATOR ?= verilator
+
+# ------------------------------------------------------------
+# Directorios
+# ------------------------------------------------------------
 
 BUILD_DIR := build
 TB_DIR    := tb/tb_sv
 RTL_DIR   := rtl/core
 
+EVID_DIR := docs/verification
+LOG_DIR  := $(EVID_DIR)/logs
+DATE_STR ?= $(shell date +%F_%H-%M-%S)
+
+# ------------------------------------------------------------
+# Flags
+# ------------------------------------------------------------
+
 IVERILOG_FLAGS := -g2012 -Wall
-VERILATOR_FLAGS := --lint-only --timing
+VERILATOR_FLAGS := --lint-only --timing -Wall -Wno-fatal
+
+# ------------------------------------------------------------
+# RTL del núcleo
+# ------------------------------------------------------------
+
+RTL_FILES := \
+	$(RTL_DIR)/alu.sv \
+	$(RTL_DIR)/branch_unit.sv \
+	$(RTL_DIR)/csr_file.sv \
+	$(RTL_DIR)/decoder.sv \
+	$(RTL_DIR)/ex_mem_reg.sv \
+	$(RTL_DIR)/hazard_unit.sv \
+	$(RTL_DIR)/id_ex_reg.sv \
+	$(RTL_DIR)/if_id_reg.sv \
+	$(RTL_DIR)/imm_gen.sv \
+	$(RTL_DIR)/mem_wb_reg.sv \
+	$(RTL_DIR)/regfile.sv \
+	$(RTL_DIR)/expansion_demo_periph.sv \
+	$(RTL_DIR)/axi4lite_expansion_demo_periph.sv \
+	$(RTL_DIR)/exp_axi4lite_master_bridge.sv \
+	$(RTL_DIR)/core_top.sv
+
+# ------------------------------------------------------------
+# Testbenches SystemVerilog
+# El nombre debe coincidir con:
+#   tb/tb_sv/<nombre>.sv
+# y con el módulo top:
+#   module <nombre>;
+# ------------------------------------------------------------
 
 TESTS := \
+	tb_alu_w \
+	tb_decoder_w \
 	tb_core_smoke \
-	tb_core_hazard_branch \
 	tb_core_jump \
-	tb_core_mem_sizes
+	tb_core_mem_sizes \
+	tb_core_hazards \
+	tb_core_hazard_branch \
+	tb_core_system_trap \
+	tb_core_csr_ops \
+	tb_core_ebreak_trap \
+	tb_core_branch_misaligned_trap \
+	tb_core_jal_misaligned_trap \
+	tb_core_illegal_trap \
+	tb_core_jalr_misaligned_trap \
+	tb_core_directed \
+	tb_expansion_demo_periph \
+	tb_core_expansion_mmio \
+	tb_core_expansion_fault_trap \
+	tb_core_expansion_store_fault_trap \
+	tb_axi4lite_expansion_demo_periph \
+	tb_exp_axi4lite_master_bridge \
+	tb_core_expansion_axi4lite_wait \
+	tb_core_expansion_axi4lite_load_fault \
+	tb_core_expansion_axi4lite_store_fault
 
-.PHONY: all sim lint regress clean \
-        tb_core_smoke tb_core_hazard_branch tb_core_jump tb_core_mem_sizes \
-        lint_tb_core_smoke lint_tb_core_hazard_branch lint_tb_core_jump lint_tb_core_mem_sizes
+LINT_TESTS := $(addprefix lint_,$(TESTS))
 
-all: regress
+# ------------------------------------------------------------
+# Targets phony
+# ------------------------------------------------------------
+
+.PHONY: all help \
+	check-tools check-verilator \
+	sim regression regress lint lint-rtl lint-log \
+	run-one list-tests \
+	evidence_dirs regress-log \
+	clean clean-vcd \
+	$(TESTS) $(LINT_TESTS)
+
+# ------------------------------------------------------------
+# Target por defecto
+# ------------------------------------------------------------
+
+all: regression
+
+help:
+> @echo "Targets disponibles:"
+> @echo "  make                         Ejecuta regression"
+> @echo "  make regression              Ejecuta todas las simulaciones con Icarus"
+> @echo "  make regress                 Ejecuta simulación + lint"
+> @echo "  make lint                    Ejecuta lint con Verilator"
+> @echo "  make list-tests              Lista los testbenches configurados"
+> @echo "  make run-one TB=<test>       Ejecuta un test específico"
+> @echo "  make regress-log             Guarda log de regresión en docs/verification/logs"
+> @echo "  make clean                   Limpia build"
+> @echo "  make tb_core_expansion_store_fault_trap"
+> @echo ""
+> @echo "Ejemplos:"
+> @echo "  make tb_core_system_trap"
+> @echo "  make tb_expansion_demo_periph"
+> @echo "  make tb_core_expansion_fault_trap"
+> @echo "  make tb_core_expansion_mmio"
+> @echo "  make run-one TB=tb_core_illegal_trap"
+> @echo "  make run-one TB=tb_core_expansion_mmio"
+> @echo "  make run-one TB=tb_core_expansion_fault_trap"
+> @echo "  make regress-log"
+
+# ------------------------------------------------------------
+# Directorios
+# ------------------------------------------------------------
 
 $(BUILD_DIR):
-	mkdir -p $(BUILD_DIR)
+> @mkdir -p $(BUILD_DIR)
 
-# -------------------------
-# Simulación
-# -------------------------
+$(LOG_DIR):
+> @mkdir -p $(LOG_DIR)
 
-tb_core_smoke: $(BUILD_DIR)
-	$(IVERILOG) $(IVERILOG_FLAGS) -s tb_core_smoke -o $(BUILD_DIR)/tb_core_smoke.vvp -c $(TB_DIR)/core_smoke.f
-	$(VVP) $(BUILD_DIR)/tb_core_smoke.vvp
+evidence_dirs: $(LOG_DIR)
 
-tb_core_hazard_branch: $(BUILD_DIR)
-	$(IVERILOG) $(IVERILOG_FLAGS) -s tb_core_hazard_branch -o $(BUILD_DIR)/tb_core_hazard_branch.vvp -c $(TB_DIR)/core_hazard_branch.f
-	$(VVP) $(BUILD_DIR)/tb_core_hazard_branch.vvp
+# ------------------------------------------------------------
+# Revisión de herramientas
+# ------------------------------------------------------------
 
-tb_core_jump: $(BUILD_DIR)
-	$(IVERILOG) $(IVERILOG_FLAGS) -s tb_core_jump -o $(BUILD_DIR)/tb_core_jump.vvp -c $(TB_DIR)/core_jump.f
-	$(VVP) $(BUILD_DIR)/tb_core_jump.vvp
+check-tools:
+> @command -v $(IVERILOG) >/dev/null 2>&1 || { echo "ERROR: no se encontró $(IVERILOG)"; exit 1; }
+> @command -v $(VVP) >/dev/null 2>&1 || { echo "ERROR: no se encontró $(VVP)"; exit 1; }
 
-tb_core_mem_sizes: $(BUILD_DIR)
-	$(IVERILOG) $(IVERILOG_FLAGS) -s tb_core_mem_sizes -o $(BUILD_DIR)/tb_core_mem_sizes.vvp -c $(TB_DIR)/core_mem_sizes.f
-	$(VVP) $(BUILD_DIR)/tb_core_mem_sizes.vvp
+check-verilator:
+> @command -v $(VERILATOR) >/dev/null 2>&1 || { echo "ERROR: no se encontró $(VERILATOR)"; exit 1; }
 
-sim: tb_core_smoke tb_core_hazard_branch tb_core_jump tb_core_mem_sizes
+# ------------------------------------------------------------
+# Lista de pruebas
+# ------------------------------------------------------------
 
-# -------------------------
-# Lint
-# -------------------------
+list-tests:
+> @echo "Testbenches configurados:"
+> @for t in $(TESTS); do echo "  $$t"; done
 
-lint_tb_core_smoke:
-	$(VERILATOR) $(VERILATOR_FLAGS) --top-module tb_core_smoke \
-		$(TB_DIR)/tb_core_smoke.sv \
-		$(RTL_DIR)/alu.sv \
-		$(RTL_DIR)/branch_unit.sv \
-		$(RTL_DIR)/decoder.sv \
-		$(RTL_DIR)/ex_mem_reg.sv \
-		$(RTL_DIR)/hazard_unit.sv \
-		$(RTL_DIR)/id_ex_reg.sv \
-		$(RTL_DIR)/if_id_reg.sv \
-		$(RTL_DIR)/imm_gen.sv \
-		$(RTL_DIR)/mem_wb_reg.sv \
-		$(RTL_DIR)/regfile.sv \
-		$(RTL_DIR)/core_top.sv
+# ------------------------------------------------------------
+# Simulación individual
+# ------------------------------------------------------------
 
-lint_tb_core_hazard_branch:
-	$(VERILATOR) $(VERILATOR_FLAGS) --top-module tb_core_hazard_branch \
-		$(TB_DIR)/tb_core_hazard_branch.sv \
-		$(RTL_DIR)/alu.sv \
-		$(RTL_DIR)/branch_unit.sv \
-		$(RTL_DIR)/decoder.sv \
-		$(RTL_DIR)/ex_mem_reg.sv \
-		$(RTL_DIR)/hazard_unit.sv \
-		$(RTL_DIR)/id_ex_reg.sv \
-		$(RTL_DIR)/if_id_reg.sv \
-		$(RTL_DIR)/imm_gen.sv \
-		$(RTL_DIR)/mem_wb_reg.sv \
-		$(RTL_DIR)/regfile.sv \
-		$(RTL_DIR)/core_top.sv
+$(TESTS): check-tools $(BUILD_DIR)
+> @echo "============================================================"
+> @echo "TEST: $@"
+> @echo "============================================================"
+> @if [ ! -f "$(TB_DIR)/$@.sv" ]; then \
+> 	echo "ERROR: no existe $(TB_DIR)/$@.sv"; \
+> 	exit 1; \
+> fi
+> @$(IVERILOG) $(IVERILOG_FLAGS) \
+> 	-s $@ \
+> 	-o $(BUILD_DIR)/$@.vvp \
+> 	$(RTL_FILES) \
+> 	$(TB_DIR)/$@.sv
+> @set -o pipefail; \
+> $(VVP) $(BUILD_DIR)/$@.vvp | tee $(BUILD_DIR)/$@.log; \
+> sim_status=$${PIPESTATUS[0]}; \
+> if [ $$sim_status -ne 0 ]; then \
+> 	echo "[FAIL] $@ -- vvp retornó error"; \
+> 	exit $$sim_status; \
+> fi; \
+> if grep -Eq "(^|[[:space:]])FAIL:|(^|[[:space:]])ERROR:" $(BUILD_DIR)/$@.log; then \
+> 	echo "[FAIL] $@ -- el log contiene FAIL o ERROR"; \
+> 	exit 1; \
+> fi
+> @echo "[PASS] $@"
 
-lint_tb_core_jump:
-	$(VERILATOR) $(VERILATOR_FLAGS) --top-module tb_core_jump \
-		$(TB_DIR)/tb_core_jump.sv \
-		$(RTL_DIR)/alu.sv \
-		$(RTL_DIR)/branch_unit.sv \
-		$(RTL_DIR)/decoder.sv \
-		$(RTL_DIR)/ex_mem_reg.sv \
-		$(RTL_DIR)/hazard_unit.sv \
-		$(RTL_DIR)/id_ex_reg.sv \
-		$(RTL_DIR)/if_id_reg.sv \
-		$(RTL_DIR)/imm_gen.sv \
-		$(RTL_DIR)/mem_wb_reg.sv \
-		$(RTL_DIR)/regfile.sv \
-		$(RTL_DIR)/core_top.sv
+# ------------------------------------------------------------
+# Simulación completa
+# ------------------------------------------------------------
 
-lint_tb_core_mem_sizes:
-	$(VERILATOR) $(VERILATOR_FLAGS) --top-module tb_core_mem_sizes \
-		$(TB_DIR)/tb_core_mem_sizes.sv \
-		$(RTL_DIR)/alu.sv \
-		$(RTL_DIR)/branch_unit.sv \
-		$(RTL_DIR)/decoder.sv \
-		$(RTL_DIR)/ex_mem_reg.sv \
-		$(RTL_DIR)/hazard_unit.sv \
-		$(RTL_DIR)/id_ex_reg.sv \
-		$(RTL_DIR)/if_id_reg.sv \
-		$(RTL_DIR)/imm_gen.sv \
-		$(RTL_DIR)/mem_wb_reg.sv \
-		$(RTL_DIR)/regfile.sv \
-		$(RTL_DIR)/core_top.sv
+sim: $(TESTS)
 
-lint: lint_tb_core_smoke lint_tb_core_hazard_branch lint_tb_core_jump lint_tb_core_mem_sizes
+regression: sim
+> @echo "============================================================"
+> @echo "PASS: regresión local con Icarus completada"
+> @echo "============================================================"
 
-# -------------------------
-# Regresión completa
-# -------------------------
-
+# Mantengo regress como alias más estricto:
+# simulación + lint.
 regress: sim lint
-	@echo "PASS: regresion local completa OK"
+> @echo "============================================================"
+> @echo "PASS: regresión completa con simulación + lint completada"
+> @echo "============================================================"
 
-clean:
-	rm -rf $(BUILD_DIR)
+# ------------------------------------------------------------
+# Ejecutar un test específico por variable
+# ------------------------------------------------------------
 
-.PHONY: evidence_dirs regress-log
+run-one:
+> @if [ -z "$(TB)" ]; then \
+> 	echo "ERROR: usa make run-one TB=nombre_del_test"; \
+> 	echo "Ejemplo: make run-one TB=tb_core_system_trap"; \
+> 	exit 1; \
+> fi
+> @$(MAKE) $(TB)
 
-evidence_dirs:
-	mkdir -p $(LOG_DIR)
+# ------------------------------------------------------------
+# Lint con Verilator
+# ------------------------------------------------------------
+
+lint-rtl: check-verilator
+> @echo "============================================================"
+> @echo "LINT RTL: core_top + módulos del núcleo"
+> @echo "============================================================"
+> @$(VERILATOR) $(VERILATOR_FLAGS) \
+> 	--top-module core_top \
+> 	$(RTL_FILES)
+> @echo "============================================================"
+> @echo "PASS: lint RTL completado"
+> @echo "============================================================"
+
+lint-log: evidence_dirs
+> @set -o pipefail; \
+> $(MAKE) lint-rtl 2>&1 | tee $(LOG_DIR)/$(DATE_STR)_lint_rtl.log
+
+lint_%: check-verilator
+> @echo "============================================================"
+> @echo "LINT: $*"
+> @echo "============================================================"
+> @if [ ! -f "$(TB_DIR)/$*.sv" ]; then \
+> 	echo "ERROR: no existe $(TB_DIR)/$*.sv"; \
+> 	exit 1; \
+> fi
+> @$(VERILATOR) $(VERILATOR_FLAGS) \
+> 	--top-module $* \
+> 	$(RTL_FILES) \
+> 	$(TB_DIR)/$*.sv
+
+lint: lint-rtl $(LINT_TESTS)
+> @echo "============================================================"
+> @echo "PASS: lint completado"
+> @echo "============================================================"
+
+# ------------------------------------------------------------
+# Regresión con log de evidencia
+# ------------------------------------------------------------
 
 regress-log: evidence_dirs
-	$(MAKE) regress 2>&1 | tee $(LOG_DIR)/$(DATE_STR)_regress_local.log
+> @set -o pipefail; \
+> $(MAKE) regression 2>&1 | tee $(LOG_DIR)/$(DATE_STR)_regression_local.log
+
+# ------------------------------------------------------------
+# Limpieza
+# ------------------------------------------------------------
+
+clean:
+> @rm -rf $(BUILD_DIR)
+
+clean-vcd:
+> @rm -f *.vcd
+> @rm -f tb/*.vcd
+> @rm -f tb/tb_sv/*.vcd
+> @rm -f $(BUILD_DIR)/*.vcd
