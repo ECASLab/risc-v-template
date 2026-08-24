@@ -21,13 +21,15 @@ module csr_file #(
     input  logic        trap_valid,
     input  logic [63:0] trap_pc,
     input  logic [63:0] trap_cause,
+    input  logic [63:0] trap_value,
 
     input  logic        mret_valid,
 
     // Salidas útiles para el core
     output logic [63:0] mtvec_o,
     output logic [63:0] mepc_o,
-    output logic [63:0] mcause_o
+    output logic [63:0] mcause_o,
+    output logic [63:0] mtval_o
 );
 
     // ---------------------------------------------------------
@@ -38,6 +40,7 @@ module csr_file #(
     localparam logic [11:0] CSR_MTVEC   = 12'h305;
     localparam logic [11:0] CSR_MEPC    = 12'h341;
     localparam logic [11:0] CSR_MCAUSE  = 12'h342;
+    localparam logic [11:0] CSR_MTVAL   = 12'h343;
 
     // CSRs de identificación de máquina.
     // Se exponen como lectura válida para mejorar compatibilidad con pruebas
@@ -78,6 +81,7 @@ module csr_file #(
     logic [63:0] mtvec_r;
     logic [63:0] mepc_r;
     logic [63:0] mcause_r;
+    logic [63:0] mtval_r;
 
     logic [63:0] selected_csr_value;
     logic        selected_csr_exists;
@@ -115,6 +119,7 @@ module csr_file #(
             CSR_MTVEC:   selected_csr_value = mtvec_r;
             CSR_MEPC:    selected_csr_value = mepc_r;
             CSR_MCAUSE:  selected_csr_value = mcause_r;
+            CSR_MTVAL:   selected_csr_value = mtval_r;
 
             // CSRs de identificación.
             // Valores mínimos válidos para un núcleo académico de un solo hart.
@@ -189,10 +194,12 @@ module csr_file #(
             mtvec_r        <= {RESET_MTVEC[63:2], 2'b00}; // Direct mode
             mepc_r         <= 64'd0;
             mcause_r       <= 64'd0;
+            mtval_r        <= 64'd0;
         end
         else if (trap_valid) begin
             mepc_r         <= {trap_pc[63:2], 2'b00};
             mcause_r       <= trap_cause;
+            mtval_r        <= trap_value;
 
             mstatus_mpie_r <= mstatus_mie_r;
             mstatus_mie_r  <= 1'b0;
@@ -233,6 +240,10 @@ module csr_file #(
                     mcause_r <= write_value;
                 end
 
+                CSR_MTVAL: begin
+                    mtval_r <= write_value;
+                end
+
                 default: begin
                     // Nada: ya quedó marcado como ilegal combinacionalmente.
                 end
@@ -243,6 +254,7 @@ module csr_file #(
     assign mtvec_o  = mtvec_r;
     assign mepc_o   = mepc_r;
     assign mcause_o = mcause_r;
+    assign mtval_o  = mtval_r;
 
     wire _unused_ok = 1'b0 && &{
         1'b0,

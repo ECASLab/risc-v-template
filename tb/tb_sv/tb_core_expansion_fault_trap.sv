@@ -209,21 +209,21 @@ module tb_core_expansion_fault_trap;
     always_comb begin
         imem_rdata = enc_nop();
 
-        if (imem_addr[11:2] < IMEM_WORDS) begin
-            imem_rdata = instr_mem[imem_addr[11:2]];
+        if (imem_addr[63:10] == '0) begin
+            imem_rdata = instr_mem[imem_addr[9:2]];
         end
     end
 
     always_comb begin
         dmem_rdata = 64'd0;
 
-        if (dmem_addr[12:3] < DMEM_WORDS) begin
+        if (dmem_addr[63:13] == '0) begin
             dmem_rdata = data_mem[dmem_addr[12:3]];
         end
     end
 
     always_ff @(posedge clk)  begin
-        if (!rst && dmem_we) begin
+        if (!rst && dmem_we && (dmem_addr[63:13] == '0)) begin
             for (b = 0; b < 8; b = b + 1) begin
                 if (dmem_wstrb[b]) begin
                     data_mem[dmem_addr[12:3]][b*8 +: 8] <= dmem_wdata[b*8 +: 8];

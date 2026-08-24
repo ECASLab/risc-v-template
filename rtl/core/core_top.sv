@@ -66,7 +66,9 @@ module core_top #(
     localparam logic [63:0] MCAUSE_INSTR_ADDR_MISALIGNED = 64'd0;
     localparam logic [63:0] MCAUSE_ILLEGAL_INSTR         = 64'd2;
     localparam logic [63:0] MCAUSE_BREAKPOINT            = 64'd3;
+    localparam logic [63:0] MCAUSE_LOAD_ADDR_MISALIGNED  = 64'd4;
     localparam logic [63:0] MCAUSE_LOAD_ACCESS_FAULT     = 64'd5;
+    localparam logic [63:0] MCAUSE_STORE_ADDR_MISALIGNED = 64'd6;
     localparam logic [63:0] MCAUSE_STORE_ACCESS_FAULT    = 64'd7;
     localparam logic [63:0] MCAUSE_ECALL_M               = 64'd11;
 
@@ -77,6 +79,7 @@ module core_top #(
     logic [63:0] csr_mtvec;
     logic [63:0] csr_mepc;
     logic [63:0] csr_mcause;
+    logic [63:0] csr_mtval;
 
     // =========================================================
     // PC / IF stage 
@@ -118,17 +121,26 @@ module core_top #(
     logic mem_exp_wait_stall;
     logic pipeline_stall;
 
+    // Una instrucción detenida en EX no puede modificar estado arquitectural.
+    // Por ahora el único stall global de MEM es el wait-state del puerto
+    // de expansión. Más adelante esta señal se generalizará cuando la
+    // memoria principal también tenga handshake/latencia.
+    logic ex_arch_side_effect_enable;
+
     // Trap detectado en etapa MEM.
-    // Se usa para convertir errores del puerto de expansión en excepciones
-    // arquitecturales de load/store access fault.
+    // Incluye:
+    // - accesos load/store desalineados
+    // - errores del puerto de expansión convertidos en access fault
     logic        mem_sync_trap;
     logic [63:0] mem_trap_cause;
+    logic [63:0] mem_trap_value;
 
     // Trap finalmente tomado por el core.
     // MEM tiene prioridad sobre EX porque la instrucción en MEM es más antigua.
     logic        trap_taken_valid;
     logic [63:0] trap_taken_pc;
     logic [63:0] trap_taken_cause;
+    logic [63:0] trap_taken_value;
 
     // Lógica de generación de señales de stall y flush (por ahora solo se implementa el hazard de tipo load-use con un stall hacia IF/ID, el resto de señales se dejan en 0 para no tener stalls ni flushes adicionales)
     assign load_use_hazard =
@@ -157,6 +169,9 @@ module core_top #(
     assign pipeline_stall =
         mem_exp_wait_stall ||
         data_hazard_stall;
+
+    assign ex_arch_side_effect_enable =
+        !mem_exp_wait_stall;
 
     assign if_id_stall  = pipeline_stall;
     assign id_ex_stall  = mem_exp_wait_stall;
@@ -591,6 +606,7 @@ module core_top #(
     logic        ex_sync_trap;
     logic        ex_mret_redirect;
     logic [63:0] ex_trap_cause;
+    logic [63:0] ex_trap_value;
 
     // Señales para operaciones con CSR en EX
     logic [11:0] ex_csr_addr;
@@ -667,7 +683,12 @@ module core_top #(
         .clk            (clk),
         .rst            (rst),
 
-        .access_valid   (ex_valid_out && ex_csr_en_out && !ex_illegal_instr_out),
+        .access_valid (
+            ex_valid_out &&
+            ex_csr_en_out &&
+            !ex_illegal_instr_out &&
+            ex_arch_side_effect_enable
+        ),
         .access_addr    (ex_csr_addr),
         .access_read_en (ex_csr_read_out),
         .access_write_en(ex_csr_write_out),
@@ -680,14 +701,20 @@ module core_top #(
         .trap_valid     (trap_taken_valid),
         .trap_pc        (trap_taken_pc),
         .trap_cause     (trap_taken_cause),
+        .trap_value     (trap_taken_value),
 
         // Si hay trap más antiguo en MEM, no permitimos que un MRET más joven
         // en EX modifique el estado de CSRs en el mismo ciclo.
-        .mret_valid     (ex_mret_redirect && !mem_sync_trap),
+        .mret_valid (
+            ex_mret_redirect &&
+            ex_arch_side_effect_enable &&
+            !mem_sync_trap
+        ),
 
         .mtvec_o        (csr_mtvec),
         .mepc_o         (csr_mepc),
-        .mcause_o       (csr_mcause)
+        .mcause_o       (csr_mcause),
+        .mtval_o        (csr_mtval)
     );
     // La señal de instrucción ilegal efectiva en EX se genera combinando la señal de instrucción ilegal decodificada (que indica que la instrucción no es reconocida por el decoder) con la señal de acceso ilegal a CSR (que indica que se ha intentado acceder a un CSR de manera no permitida, por ejemplo, escribiendo a un CSR de solo lectura o leyendo un CSR que no existe)
     assign ex_effective_illegal_instr =
@@ -696,7 +723,7 @@ module core_top #(
     // El resultado que se pasa hacia MEM/WB desde EX para instrucciones que escriben en rd (ya sea el resultado de la ALU o el dato leído desde un CSR, dependiendo del tipo de instrucción) se selecciona entre el resultado de la ALU o el dato leído desde el CSR en función de si la instrucción es una instrucción CSR o no (controlado por ex_csr_en_out)
     assign ex_result_to_pipe =
         ex_csr_en_out ? ex_csr_rdata : ex_alu_result;
-
+    
     // Cálculo de causa de trap en EX para instrucciones ilegales, redirecciones de PC con target no alineado, y ECALL/EBREAK válidos (que no sean ilegales)
     always_comb begin
         ex_trap_cause = 64'd0;
@@ -709,6 +736,41 @@ module core_top #(
             ex_trap_cause = MCAUSE_ECALL_M;
         else if (ex_sys_ebreak_out)
             ex_trap_cause = MCAUSE_BREAKPOINT;
+    end
+
+    // ---------------------------------------------------------
+    // Valor informativo para mtval en traps detectados en EX.
+    //
+    // Política implementada:
+    // - illegal instruction:
+    //     bits de la instrucción causante, zero-extended a XLEN
+    //
+    // - instruction address misaligned:
+    //     target de control-flow desalineado
+    //
+    // - ECALL:
+    //     mtval = 0
+    //
+    // - EBREAK:
+    //     mtval = 0
+    //     La especificación también permite usar el PC, pero
+    //     elegimos cero porque mepc ya contiene esa dirección.
+    // ---------------------------------------------------------
+    always_comb begin
+        ex_trap_value = 64'd0;
+
+        if (ex_effective_illegal_instr) begin
+            ex_trap_value = {32'd0, ex_instr_out};
+        end
+        else if (ex_target_misaligned) begin
+            ex_trap_value = ex_redirect_target;
+        end
+        else if (ex_sys_ecall_out) begin
+            ex_trap_value = 64'd0;
+        end
+        else if (ex_sys_ebreak_out) begin
+            ex_trap_value = 64'd0;
+        end
     end
 
     // Señal de trap síncrono que se genera en EX cuando se detecta una instrucción ilegal, una redirección de PC con target no alineado, o una instrucción ECALL/EBREAK válida (que no sea ilegal)
@@ -866,7 +928,8 @@ module core_top #(
     // Convención de esta iteración:
     // - dmem_rdata devuelve la línea alineada de 64 bits que contiene dmem_addr
     // - el core selecciona byte/half/word usando dmem_addr[2:0]
-    // - por ahora asumimos accesos naturalmente alineados
+    // - los accesos desalineados generan una excepción arquitectural en MEM
+    // - un acceso desalineado no se envía al puerto de expansión ni escribe dmem
     // =========================================================
     logic [63:0] mem_rdata_shifted;
     logic [63:0] mem_load_data;
@@ -878,6 +941,12 @@ module core_top #(
     logic        mem_is_exp_access;
     logic        mem_is_dmem_access;
     logic [63:0] mem_selected_rdata;
+
+    // Señales de control de trap y excepciones en MEM
+    logic        mem_load_misaligned;
+    logic        mem_store_misaligned;
+    logic        mem_addr_misaligned;
+    logic        mem_exp_access_fault;
 
     logic [2:0]  mem_addr_offset;
     logic [5:0]  mem_shift_bits;
@@ -911,14 +980,58 @@ module core_top #(
         (mem_mem_read_out || mem_mem_write_out) &&
         !mem_illegal_instr_out;
 
+    // ---------------------------------------------------------
+    // Comprobación de alineamiento natural.
+    //
+    // size = 00 -> byte       : cualquier dirección
+    // size = 01 -> halfword   : addr[0]   debe ser 0
+    // size = 10 -> word       : addr[1:0] debe ser 00
+    // size = 11 -> doubleword : addr[2:0] debe ser 000
+    // ---------------------------------------------------------
+    always_comb begin
+        mem_load_misaligned = 1'b0;
+
+        if (mem_access_active && mem_mem_read_out) begin
+            case (mem_load_size_out)
+                2'b00:   mem_load_misaligned = 1'b0;
+                2'b01:   mem_load_misaligned = mem_alu_result_out[0];
+                2'b10:   mem_load_misaligned = |mem_alu_result_out[1:0];
+                2'b11:   mem_load_misaligned = |mem_alu_result_out[2:0];
+                default: mem_load_misaligned = 1'b0;
+            endcase
+        end
+    end
+
+    always_comb begin
+        mem_store_misaligned = 1'b0;
+
+        if (mem_access_active && mem_mem_write_out) begin
+            case (mem_store_size_out)
+                2'b00:   mem_store_misaligned = 1'b0;
+                2'b01:   mem_store_misaligned = mem_alu_result_out[0];
+                2'b10:   mem_store_misaligned = |mem_alu_result_out[1:0];
+                2'b11:   mem_store_misaligned = |mem_alu_result_out[2:0];
+                default: mem_store_misaligned = 1'b0;
+            endcase
+        end
+    end
+
+    assign mem_addr_misaligned =
+        mem_load_misaligned ||
+        mem_store_misaligned;
+
     assign mem_is_exp_region =
         ((mem_alu_result_out & EXP_MASK) == (EXP_BASE & EXP_MASK));
 
     assign mem_is_exp_access =
-        mem_access_active && mem_is_exp_region;
+        mem_access_active &&
+        !mem_addr_misaligned &&
+        mem_is_exp_region;
 
     assign mem_is_dmem_access =
-        mem_access_active && !mem_is_exp_region;
+        mem_access_active &&
+        !mem_addr_misaligned &&
+        !mem_is_exp_region;
 
     // Un error reportado por el periférico de expansión se convierte en
     // excepción arquitectural. La instrucción causante está en MEM, por lo
@@ -928,19 +1041,51 @@ module core_top #(
         mem_is_exp_access &&
         !exp_ready;
 
-    assign mem_sync_trap =
+    assign mem_exp_access_fault =
         mem_is_exp_access &&
         exp_ready &&
         exp_error;
 
+    assign mem_sync_trap =
+        mem_addr_misaligned ||
+        mem_exp_access_fault;
+
     always_comb begin
         mem_trap_cause = 64'd0;
 
-        if (mem_mem_read_out) begin
+        if (mem_load_misaligned) begin
+            mem_trap_cause = MCAUSE_LOAD_ADDR_MISALIGNED;
+        end
+        else if (mem_store_misaligned) begin
+            mem_trap_cause = MCAUSE_STORE_ADDR_MISALIGNED;
+        end
+        else if (mem_exp_access_fault && mem_mem_read_out) begin
             mem_trap_cause = MCAUSE_LOAD_ACCESS_FAULT;
         end
-        else if (mem_mem_write_out) begin
+        else if (mem_exp_access_fault && mem_mem_write_out) begin
             mem_trap_cause = MCAUSE_STORE_ACCESS_FAULT;
+        end
+    end
+
+    // ---------------------------------------------------------
+    // Valor informativo para mtval en traps de memoria.
+    //
+    // Todos los traps que actualmente pueden originarse en MEM
+    // están asociados con el acceso efectivo mem_alu_result_out:
+    //
+    // - load address misaligned
+    // - store address misaligned
+    // - load access fault desde expansión/MMIO
+    // - store access fault desde expansión/MMIO
+    // ---------------------------------------------------------
+    always_comb begin
+        mem_trap_value = 64'd0;
+
+        if (mem_addr_misaligned) begin
+            mem_trap_value = mem_alu_result_out;
+        end
+        else if (mem_exp_access_fault) begin
+            mem_trap_value = mem_alu_result_out;
         end
     end
 
@@ -955,6 +1100,9 @@ module core_top #(
 
     assign trap_taken_cause =
         mem_sync_trap ? mem_trap_cause : ex_trap_cause;
+
+    assign trap_taken_value =
+        mem_sync_trap ? mem_trap_value : ex_trap_value;
 
     // Para loads, el dato puede venir de memoria normal o del puerto de expansión.
     assign mem_selected_rdata =
@@ -1184,6 +1332,7 @@ module core_top #(
         wb_pc_out,
         wb_instr_out,
         csr_mcause,
+        csr_mtval,
         csr_mtvec[1:0],
         csr_mepc[1:0],
         exp_ready,

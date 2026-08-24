@@ -40,7 +40,7 @@ module expansion_demo_periph #(
     logic        write_to_read_only;
 
     logic [63:0] control_write_value;
-    logic [63:0] status_write_value;
+    logic        status_w1c_done;
     logic [63:0] operand_a_write_value;
     logic [63:0] operand_b_write_value;
 
@@ -63,7 +63,7 @@ module expansion_demo_periph #(
     endfunction
 
     assign control_write_value   = apply_wstrb(control_r,   exp_wdata_i, exp_wstrb_i);
-    assign status_write_value    = apply_wstrb(status_value, exp_wdata_i, exp_wstrb_i);
+    assign status_w1c_done = exp_wstrb_i[0] && exp_wdata_i[1];
     assign operand_a_write_value = apply_wstrb(operand_a_r, exp_wdata_i, exp_wstrb_i);
     assign operand_b_write_value = apply_wstrb(operand_b_r, exp_wdata_i, exp_wstrb_i);
 
@@ -156,7 +156,8 @@ module expansion_demo_periph #(
 
                 REG_STATUS: begin
                     // STATUS[1] funciona como W1C para limpiar done.
-                    if (status_write_value[1]) begin
+                    // No se debe limpiar done si el byte que contiene STATUS[1] no fue escrito.
+                    if (status_w1c_done) begin
                         done_r <= 1'b0;
                     end
                 end

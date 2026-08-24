@@ -16,6 +16,10 @@ module tb_core_expansion_mmio;
     localparam integer IMEM_WORDS = 256;
     localparam integer DMEM_WORDS = 1024;
 
+    // Número de bits necesarios para indexar las 256 palabras
+    // de la memoria de instrucciones.
+    localparam integer IMEM_INDEX_BITS = $clog2(IMEM_WORDS);
+
     // Opcodes RISC-V usados por el programa dirigido
     localparam logic [6:0] OPCODE_LUI    = 7'b0110111;
     localparam logic [6:0] OPCODE_OP_IMM = 7'b0010011;
@@ -194,8 +198,10 @@ module tb_core_expansion_mmio;
     assign imem_index = imem_addr[11:2];
 
     always @* begin
-        if (imem_index < IMEM_WORDS) begin
-            imem_rdata = instr_mem[imem_index];
+        if (imem_index < 10'(IMEM_WORDS)) begin
+            imem_rdata = instr_mem[
+                imem_index[IMEM_INDEX_BITS-1:0]
+            ];
         end
         else begin
             imem_rdata = 32'h0000_0013; // NOP = addi x0, x0, 0

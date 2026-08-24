@@ -57,6 +57,12 @@ module tb_decoder_w;
         .load_unsigned(load_unsigned),
         .wb_sel_mem(wb_sel_mem),
 
+        .csr_en(),
+        .csr_cmd(),
+        .csr_use_imm(),
+        .csr_read(),
+        .csr_write(),
+
         .rs1_used(rs1_used),
         .rs2_used(rs2_used),
 
@@ -70,7 +76,11 @@ module tb_decoder_w;
         .branch_op(branch_op),
         .jump(jump),
 
-        .illegal_instr(illegal_instr)
+        .illegal_instr(illegal_instr),
+
+        .sys_ecall(),
+        .sys_ebreak(),
+        .sys_mret()
     );
 
     localparam logic [3:0] ALU_ADD  = 4'd0;

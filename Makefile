@@ -44,7 +44,25 @@ DATE_STR ?= $(shell date +%F_%H-%M-%S)
 # ------------------------------------------------------------
 
 IVERILOG_FLAGS := -g2012 -Wall
-VERILATOR_FLAGS := --lint-only --timing -Wall -Wno-fatal
+# ------------------------------------------------------------
+# Verilator
+#
+# RTL:
+#   Lint estricto. El código sintetizable debe permanecer
+#   libre de warnings.
+#
+# Testbenches:
+#   Conservamos -Wall, pero filtramos únicamente warnings
+#   de estilo deliberados y repetitivos propios del entorno
+#   de simulación.
+# ------------------------------------------------------------
+VERILATOR_RTL_FLAGS := --lint-only -Wall
+
+VERILATOR_TB_FLAGS := --lint-only --timing -Wall \
+	-Wno-PINCONNECTEMPTY \
+	-Wno-UNUSEDSIGNAL \
+	-Wno-UNUSEDPARAM \
+	-Wno-BLKSEQ
 
 # ------------------------------------------------------------
 # RTL del núcleo
@@ -81,7 +99,9 @@ TESTS := \
 	tb_core_smoke \
 	tb_core_jump \
 	tb_core_mem_sizes \
+	tb_core_mem_misaligned_trap \
 	tb_core_hazards \
+	tb_core_mtval \
 	tb_core_hazard_branch \
 	tb_core_system_trap \
 	tb_core_csr_ops \
@@ -98,6 +118,7 @@ TESTS := \
 	tb_axi4lite_expansion_demo_periph \
 	tb_exp_axi4lite_master_bridge \
 	tb_core_expansion_axi4lite_wait \
+	tb_core_expansion_priv_wait \
 	tb_core_expansion_axi4lite_load_fault \
 	tb_core_expansion_axi4lite_store_fault
 
@@ -242,7 +263,7 @@ lint-rtl: check-verilator
 > @echo "============================================================"
 > @echo "LINT RTL: core_top + módulos del núcleo"
 > @echo "============================================================"
-> @$(VERILATOR) $(VERILATOR_FLAGS) \
+> @$(VERILATOR) $(VERILATOR_RTL_FLAGS) \
 > 	--top-module core_top \
 > 	$(RTL_FILES)
 > @echo "============================================================"
@@ -253,7 +274,7 @@ lint-log: evidence_dirs
 > @set -o pipefail; \
 > $(MAKE) lint-rtl 2>&1 | tee $(LOG_DIR)/$(DATE_STR)_lint_rtl.log
 
-lint_%: check-verilator
+$(LINT_TESTS): lint_%: check-verilator
 > @echo "============================================================"
 > @echo "LINT: $*"
 > @echo "============================================================"
@@ -261,10 +282,13 @@ lint_%: check-verilator
 > 	echo "ERROR: no existe $(TB_DIR)/$*.sv"; \
 > 	exit 1; \
 > fi
-> @$(VERILATOR) $(VERILATOR_FLAGS) \
+>@$(VERILATOR) $(VERILATOR_TB_FLAGS) \
 > 	--top-module $* \
 > 	$(RTL_FILES) \
 > 	$(TB_DIR)/$*.sv
+> @echo "============================================================"
+> @echo "PASS: lint $* completado"
+> @echo "============================================================"
 
 lint: lint-rtl $(LINT_TESTS)
 > @echo "============================================================"

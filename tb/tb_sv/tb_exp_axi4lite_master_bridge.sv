@@ -157,21 +157,30 @@ module tb_exp_axi4lite_master_bridge;
         input  logic [7:0]  strb;
         output logic        error;
         begin
-            @(posedge clk);
-            exp_addr  <= addr;
-            exp_wdata <= data;
-            exp_wstrb <= strb;
-            exp_size  <= 2'b11;
-            exp_we    <= 1'b1;
-            exp_valid <= 1'b1;
+            // El TB conduce las entradas en el flanco opuesto al usado
+            // por la lógica secuencial del DUT. Así quedan estables antes
+            // del siguiente posedge y evitamos carreras de simulación.
+            @(negedge clk);
 
+            exp_addr  = addr;
+            exp_wdata = data;
+            exp_wstrb = strb;
+            exp_size  = 2'b11;
+            exp_we    = 1'b1;
+            exp_valid = 1'b1;
+
+            // El bridge mantiene exp_ready durante ST_DONE.
             wait (exp_ready === 1'b1);
+
             error = exp_error;
 
-            @(posedge clk);
-            exp_valid <= 1'b0;
-            exp_we    <= 1'b0;
-            exp_wstrb <= 8'd0;
+            // Retiramos la petición en negedge para que quede estable
+            // antes del siguiente posedge.
+            @(negedge clk);
+
+            exp_valid = 1'b0;
+            exp_we    = 1'b0;
+            exp_wstrb = 8'd0;
         end
     endtask
 
@@ -180,20 +189,25 @@ module tb_exp_axi4lite_master_bridge;
         output logic [63:0] data;
         output logic        error;
         begin
-            @(posedge clk);
-            exp_addr  <= addr;
-            exp_wdata <= 64'd0;
-            exp_wstrb <= 8'd0;
-            exp_size  <= 2'b11;
-            exp_we    <= 1'b0;
-            exp_valid <= 1'b1;
+            // Conducir en negedge evita competir con la lógica del DUT,
+            // que captura las entradas en posedge.
+            @(negedge clk);
+
+            exp_addr  = addr;
+            exp_wdata = 64'd0;
+            exp_wstrb = 8'd0;
+            exp_size  = 2'b11;
+            exp_we    = 1'b0;
+            exp_valid = 1'b1;
 
             wait (exp_ready === 1'b1);
+
             data  = exp_rdata;
             error = exp_error;
 
-            @(posedge clk);
-            exp_valid <= 1'b0;
+            @(negedge clk);
+
+            exp_valid = 1'b0;
         end
     endtask
 
@@ -212,6 +226,7 @@ module tb_exp_axi4lite_master_bridge;
         $dumpvars(0, tb_exp_axi4lite_master_bridge);
 
         repeat (5) @(posedge clk);
+        @(negedge clk);
         rst = 1'b0;
         repeat (2) @(posedge clk);
 

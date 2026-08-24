@@ -61,7 +61,7 @@ module tb_core_directed;
     logic [31:0] imem [0:255];
 
     // Programa combinacionalmente leído
-    assign imem_rdata = imem[imem_addr[63:2]];
+    assign imem_rdata = imem[imem_addr[9:2]];
 
     // En esta prueba no usamos loads reales
     assign dmem_rdata = 64'd0;
