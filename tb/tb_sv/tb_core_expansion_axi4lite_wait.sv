@@ -3,6 +3,7 @@
 module tb_core_expansion_axi4lite_wait;
 
     localparam logic [63:0] EXP_BASE = 64'h0000_0000_8000_0000;
+    localparam int unsigned IMEM_WORDS = 256;
 
     localparam logic [63:0] ADDR_RESULT   = 64'h0000_0000_0000_0200;
     localparam logic [63:0] ADDR_SENTINEL = 64'h0000_0000_0000_0208;
@@ -13,6 +14,9 @@ module tb_core_expansion_axi4lite_wait;
     logic clk;
     logic rst;
 
+    logic        imem_req;
+    logic        imem_gnt;
+    logic        imem_rvalid;
     logic [63:0] imem_addr;
     logic [31:0] imem_rdata;
 
@@ -22,6 +26,12 @@ module tb_core_expansion_axi4lite_wait;
     logic [63:0] dmem_addr;
     logic [63:0] dmem_wdata;
     logic [1:0]  dmem_size;
+
+    // Handshake de memoria de datos.
+    logic        dmem_req;
+    logic        dmem_gnt;
+    logic        dmem_rvalid;
+    logic        dmem_error;
 
     logic        exp_valid;
     logic        exp_we;
@@ -56,8 +66,7 @@ module tb_core_expansion_axi4lite_wait;
     logic [1:0]  axi_rresp;
     logic        axi_rvalid;
     logic        axi_rready;
-
-    logic [31:0] instr_mem [0:255];
+ 
     logic [63:0] data_mem  [0:1023];
 
     logic        seen_result_store;
@@ -157,6 +166,42 @@ module tb_core_expansion_axi4lite_wait;
         end
     endtask
 
+    // =========================================================
+    // Adaptador temporal para los modelos combinacionales
+    // de memoria usados por este testbench.
+    //
+    // El core utiliza el handshake definitivo, mientras este
+    // adaptador proporciona grant inmediato y rvalid +1 ciclo.
+    // =========================================================
+    dmem_legacy_compat u_dmem_legacy_compat (
+        .clk      (clk),
+        .rst      (rst),
+        .req_i    (dmem_req),
+        .gnt_o    (dmem_gnt),
+        .rvalid_o (dmem_rvalid),
+        .error_o  (dmem_error)
+    );
+
+    // =========================================================
+    // IMEM síncrona real
+    // =========================================================
+
+    imem_sync_model #(
+        .MEM_WORDS  (IMEM_WORDS),
+        .GNT_DELAY  (0),
+        .RESP_DELAY (1)
+    ) u_imem (
+        .clk      (clk),
+        .rst      (rst),
+
+        .req_i    (imem_req),
+        .gnt_o    (imem_gnt),
+        .addr_i   (imem_addr),
+
+        .rvalid_o (imem_rvalid),
+        .rdata_o  (imem_rdata)
+    );
+
     core_top #(
         .RESET_PC(64'h0000_0000_0000_0000),
         .TRAP_VECTOR(64'h0000_0000_0000_0100),
@@ -166,9 +211,18 @@ module tb_core_expansion_axi4lite_wait;
         .clk(clk),
         .rst(rst),
 
-        .imem_addr(imem_addr),
-        .imem_rdata(imem_rdata),
-        .dmem_rdata(dmem_rdata),
+        .imem_req    (imem_req),
+        .imem_addr   (imem_addr),
+        .imem_gnt    (imem_gnt),
+        .imem_rvalid (imem_rvalid),
+        .imem_rdata  (imem_rdata),
+
+        .dmem_rdata  (dmem_rdata),
+
+        .dmem_req    (dmem_req),
+        .dmem_gnt    (dmem_gnt),
+        .dmem_rvalid (dmem_rvalid),
+        .dmem_error  (dmem_error),
 
         .dmem_we(dmem_we),
         .dmem_wstrb(dmem_wstrb),
@@ -257,13 +311,7 @@ module tb_core_expansion_axi4lite_wait;
 
     always #5 clk = ~clk;
 
-    always @(*) begin
-        if (imem_addr[63:10] != 54'd0) begin
-            imem_rdata = 32'h0000_0013;
-        end
-        else begin
-            imem_rdata = instr_mem[imem_addr[9:2]];
-        end
+    always @(*) begin 
 
         if (dmem_addr[63:13] != 51'd0) begin
             dmem_rdata = 64'd0;
@@ -318,8 +366,8 @@ module tb_core_expansion_axi4lite_wait;
 
         exp_wait_cycles = 0;
 
-        for (i = 0; i < 256; i = i + 1) begin
-            instr_mem[i] = 32'h0000_0013;
+        for (i = 0; i < IMEM_WORDS; i = i + 1) begin
+            u_imem.mem[i] = 32'h0000_0013;
         end
 
         for (i = 0; i < 1024; i = i + 1) begin
@@ -327,30 +375,30 @@ module tb_core_expansion_axi4lite_wait;
         end
 
         // x10 = 0x80000000
-        instr_mem[0]  = enc_i(12'h001, 5'd0,  3'b000, 5'd10, 7'b0010011); // addi x10, x0, 1
-        instr_mem[1]  = enc_i(12'd31,  5'd10, 3'b001, 5'd10, 7'b0010011); // slli x10, x10, 31
+        u_imem.mem[0]  = enc_i(12'h001, 5'd0,  3'b000, 5'd10, 7'b0010011); // addi x10, x0, 1
+        u_imem.mem[1]  = enc_i(12'd31,  5'd10, 3'b001, 5'd10, 7'b0010011); // slli x10, x10, 31
 
         // OPERAND_A = 0x11
-        instr_mem[2]  = enc_i(12'h011, 5'd0,  3'b000, 5'd1,  7'b0010011); // addi x1, x0, 0x11
-        instr_mem[3]  = enc_s(12'h020, 5'd1,  5'd10, 3'b011, 7'b0100011); // sd x1, 0x20(x10)
+        u_imem.mem[2]  = enc_i(12'h011, 5'd0,  3'b000, 5'd1,  7'b0010011); // addi x1, x0, 0x11
+        u_imem.mem[3]  = enc_s(12'h020, 5'd1,  5'd10, 3'b011, 7'b0100011); // sd x1, 0x20(x10)
 
         // OPERAND_B = 0x22
-        instr_mem[4]  = enc_i(12'h022, 5'd0,  3'b000, 5'd2,  7'b0010011); // addi x2, x0, 0x22
-        instr_mem[5]  = enc_s(12'h028, 5'd2,  5'd10, 3'b011, 7'b0100011); // sd x2, 0x28(x10)
+        u_imem.mem[4]  = enc_i(12'h022, 5'd0,  3'b000, 5'd2,  7'b0010011); // addi x2, x0, 0x22
+        u_imem.mem[5]  = enc_s(12'h028, 5'd2,  5'd10, 3'b011, 7'b0100011); // sd x2, 0x28(x10)
 
         // CONTROL.start = 1
-        instr_mem[6]  = enc_i(12'h001, 5'd0,  3'b000, 5'd3,  7'b0010011); // addi x3, x0, 1
-        instr_mem[7]  = enc_s(12'h010, 5'd3,  5'd10, 3'b011, 7'b0100011); // sd x3, 0x10(x10)
+        u_imem.mem[6]  = enc_i(12'h001, 5'd0,  3'b000, 5'd3,  7'b0010011); // addi x3, x0, 1
+        u_imem.mem[7]  = enc_s(12'h010, 5'd3,  5'd10, 3'b011, 7'b0100011); // sd x3, 0x10(x10)
 
         // Leer RESULT y almacenarlo en memoria normal.
         // El store inmediatamente posterior usa x4, por lo que también valida load-use.
-        instr_mem[8]  = enc_i(12'h030, 5'd10, 3'b011, 5'd4,  7'b0000011); // ld x4, 0x30(x10)
-        instr_mem[9]  = enc_s(12'h200, 5'd4,  5'd0,  3'b011, 7'b0100011); // sd x4, 0x200(x0)
+        u_imem.mem[8]  = enc_i(12'h030, 5'd10, 3'b011, 5'd4,  7'b0000011); // ld x4, 0x30(x10)
+        u_imem.mem[9]  = enc_s(12'h200, 5'd4,  5'd0,  3'b011, 7'b0100011); // sd x4, 0x200(x0)
 
         // Centinela de continuidad
-        instr_mem[10] = enc_i(12'h07b, 5'd0,  3'b000, 5'd5,  7'b0010011); // addi x5, x0, 0x7b
-        instr_mem[11] = enc_s(12'h208, 5'd5,  5'd0,  3'b011, 7'b0100011); // sd x5, 0x208(x0)
-        instr_mem[12] = enc_jal_zero();
+        u_imem.mem[10] = enc_i(12'h07b, 5'd0,  3'b000, 5'd5,  7'b0010011); // addi x5, x0, 0x7b
+        u_imem.mem[11] = enc_s(12'h208, 5'd5,  5'd0,  3'b011, 7'b0100011); // sd x5, 0x208(x0)
+        u_imem.mem[12] = enc_jal_zero();
 
         $dumpfile("build/tb_core_expansion_axi4lite_wait.vcd");
         $dumpvars(0, tb_core_expansion_axi4lite_wait);

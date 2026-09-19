@@ -9,6 +9,15 @@ module tb_core_csr_ops;
     logic        clk;
     logic        rst;
 
+    // ============================================================
+    // IMEM síncrona
+    // ============================================================
+
+    localparam int unsigned IMEM_WORDS = 256;
+
+    logic        imem_req;
+    logic        imem_gnt;
+    logic        imem_rvalid;
     logic [63:0] imem_addr;
     logic [31:0] imem_rdata;
 
@@ -18,6 +27,12 @@ module tb_core_csr_ops;
     logic [63:0] dmem_addr;
     logic [63:0] dmem_wdata;
     logic [1:0]  dmem_size;
+
+    // Handshake de memoria de datos.
+    logic        dmem_req;
+    logic        dmem_gnt;
+    logic        dmem_rvalid;
+    logic        dmem_error;
 
     // ------------------------------------------------------------
     // Señales dummy para puerto de expansión.
@@ -36,23 +51,65 @@ module tb_core_csr_ops;
     // Memoria de instrucciones mínima
     // ============================================================
 
-    logic [31:0] imem [0:255];
-
-    assign imem_rdata = imem[imem_addr[9:2]];
+    
     assign dmem_rdata = 64'd0;
 
     // ============================================================
     // DUT
     // ============================================================
 
+    // ============================================================
+    // IMEM síncrona real
+    // ============================================================
+
+    imem_sync_model #(
+        .MEM_WORDS  (IMEM_WORDS),
+        .GNT_DELAY  (0),
+        .RESP_DELAY (1)
+    ) u_imem (
+        .clk      (clk),
+        .rst      (rst),
+
+        .req_i    (imem_req),
+        .gnt_o    (imem_gnt),
+        .addr_i   (imem_addr),
+
+        .rvalid_o (imem_rvalid),
+        .rdata_o  (imem_rdata)
+    );
+
+    // =========================================================
+    // Adaptador temporal para los modelos combinacionales
+    // de memoria usados por este testbench.
+    //
+    // El core utiliza el handshake definitivo, mientras este
+    // adaptador proporciona grant inmediato y rvalid +1 ciclo.
+    // =========================================================
+    dmem_legacy_compat u_dmem_legacy_compat (
+        .clk      (clk),
+        .rst      (rst),
+        .req_i    (dmem_req),
+        .gnt_o    (dmem_gnt),
+        .rvalid_o (dmem_rvalid),
+        .error_o  (dmem_error)
+    );
+
     core_top dut (
         .clk        (clk),
         .rst        (rst),
 
-        .imem_addr  (imem_addr),
-        .imem_rdata (imem_rdata),
+        .imem_req    (imem_req),
+        .imem_addr   (imem_addr),
+        .imem_gnt    (imem_gnt),
+        .imem_rvalid (imem_rvalid),
+        .imem_rdata  (imem_rdata),
 
         .dmem_rdata (dmem_rdata),
+
+        .dmem_req    (dmem_req),
+        .dmem_gnt    (dmem_gnt),
+        .dmem_rvalid (dmem_rvalid),
+        .dmem_error  (dmem_error),
         .dmem_we    (dmem_we),
         .dmem_wstrb (dmem_wstrb),
         .dmem_addr  (dmem_addr),
@@ -139,7 +196,7 @@ module tb_core_csr_ops;
 
     initial begin
         for (i = 0; i < 256; i = i + 1) begin
-            imem[i] = enc_nop();
+            u_imem.mem[i] = enc_nop();
         end
 
         // Estado esperado al salir de reset:
@@ -151,69 +208,69 @@ module tb_core_csr_ops;
         // x1 = old mstatus = 0x1880
         // mstatus <- 0, pero el hardware mínimo debe conservar MPP=3:
         // mstatus esperado después = 0x1800
-        imem[0]  = enc_csr(CSR_MSTATUS, 5'd0, F3_CSRRWI, 5'd1);
+        u_imem.mem[0]  = enc_csr(CSR_MSTATUS, 5'd0, F3_CSRRWI, 5'd1);
 
-        imem[1]  = enc_nop();
+        u_imem.mem[1]  = enc_nop();
 
         // Setear MIE con CSRRSI uimm=8.
         // mstatus esperado después = 0x1808
-        imem[2]  = enc_csr(CSR_MSTATUS, 5'd8, F3_CSRRSI, 5'd0);
+        u_imem.mem[2]  = enc_csr(CSR_MSTATUS, 5'd8, F3_CSRRSI, 5'd0);
 
-        imem[3]  = enc_nop();
+        u_imem.mem[3]  = enc_nop();
 
         // Lectura pura con CSRRS rs1=x0.
         // x2 = 0x1808
-        imem[4]  = enc_csr(CSR_MSTATUS, 5'd0, F3_CSRRS, 5'd2);
+        u_imem.mem[4]  = enc_csr(CSR_MSTATUS, 5'd0, F3_CSRRS, 5'd2);
 
         // Limpiar MIE con CSRRCI uimm=8.
         // x3 = old mstatus = 0x1808
         // mstatus esperado después = 0x1800
-        imem[5]  = enc_csr(CSR_MSTATUS, 5'd8, F3_CSRRCI, 5'd3);
+        u_imem.mem[5]  = enc_csr(CSR_MSTATUS, 5'd8, F3_CSRRCI, 5'd3);
 
-        imem[6]  = enc_nop();
+        u_imem.mem[6]  = enc_nop();
 
         // Lectura pura.
         // x4 = 0x1800
-        imem[7]  = enc_csr(CSR_MSTATUS, 5'd0, F3_CSRRS, 5'd4);
+        u_imem.mem[7]  = enc_csr(CSR_MSTATUS, 5'd0, F3_CSRRS, 5'd4);
 
         // x6 = 0x80, máscara para MPIE.
-        imem[8]  = enc_addi(5'd6, 5'd0, 12'h080);
+        u_imem.mem[8]  = enc_addi(5'd6, 5'd0, 12'h080);
 
-        imem[9]  = enc_nop();
+        u_imem.mem[9]  = enc_nop();
 
         // Setear MPIE con CSRRS usando máscara en x6.
         // x5 = old mstatus = 0x1800
         // mstatus esperado después = 0x1880
-        imem[10] = enc_csr(CSR_MSTATUS, 5'd6, F3_CSRRS, 5'd5);
+        u_imem.mem[10] = enc_csr(CSR_MSTATUS, 5'd6, F3_CSRRS, 5'd5);
 
-        imem[11] = enc_nop();
+        u_imem.mem[11] = enc_nop();
 
         // Limpiar MPIE con CSRRC usando máscara en x6.
         // x7 = old mstatus = 0x1880
         // mstatus esperado después = 0x1800
-        imem[12] = enc_csr(CSR_MSTATUS, 5'd6, F3_CSRRC, 5'd7);
+        u_imem.mem[12] = enc_csr(CSR_MSTATUS, 5'd6, F3_CSRRC, 5'd7);
 
-        imem[13] = enc_nop();
+        u_imem.mem[13] = enc_nop();
 
         // Lectura final de mstatus.
         // x8 = 0x1800
-        imem[14] = enc_csr(CSR_MSTATUS, 5'd0, F3_CSRRS, 5'd8);
+        u_imem.mem[14] = enc_csr(CSR_MSTATUS, 5'd0, F3_CSRRS, 5'd8);
 
         // x9 = 0x55
-        imem[15] = enc_addi(5'd9, 5'd0, 12'h055);
+        u_imem.mem[15] = enc_addi(5'd9, 5'd0, 12'h055);
 
-        imem[16] = enc_nop();
+        u_imem.mem[16] = enc_nop();
 
         // Escribir mcause con CSRRW.
         // x10 = old mcause = 0
         // mcause esperado después = 0x55
-        imem[17] = enc_csr(CSR_MCAUSE, 5'd9, F3_CSRRW, 5'd10);
+        u_imem.mem[17] = enc_csr(CSR_MCAUSE, 5'd9, F3_CSRRW, 5'd10);
 
-        imem[18] = enc_nop();
+        u_imem.mem[18] = enc_nop();
 
         // Leer mcause con CSRRS rs1=x0.
         // x11 = 0x55
-        imem[19] = enc_csr(CSR_MCAUSE, 5'd0, F3_CSRRS, 5'd11);
+        u_imem.mem[19] = enc_csr(CSR_MCAUSE, 5'd0, F3_CSRRS, 5'd11);
     end
 
     // ============================================================

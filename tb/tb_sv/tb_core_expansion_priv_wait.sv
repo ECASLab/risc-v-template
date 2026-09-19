@@ -2,9 +2,14 @@
 
 module tb_core_expansion_priv_wait;
 
+    localparam int unsigned IMEM_WORDS = 256;
+
     logic clk;
     logic rst;
 
+    logic        imem_req;
+    logic        imem_gnt;
+    logic        imem_rvalid;
     logic [63:0] imem_addr;
     logic [31:0] imem_rdata;
 
@@ -14,6 +19,12 @@ module tb_core_expansion_priv_wait;
     logic [63:0] dmem_addr;
     logic [63:0] dmem_wdata;
     logic [1:0]  dmem_size;
+
+    // Handshake de memoria de datos.
+    logic        dmem_req;
+    logic        dmem_gnt;
+    logic        dmem_rvalid;
+    logic        dmem_error;
 
     logic        exp_valid;
     logic        exp_we;
@@ -66,6 +77,42 @@ module tb_core_expansion_priv_wait;
     // DUT
     // Región de expansión: 0x1000 - 0x1FFF
     // ---------------------------------------------------------
+    // =========================================================
+    // Adaptador temporal para los modelos combinacionales
+    // de memoria usados por este testbench.
+    //
+    // El core utiliza el handshake definitivo, mientras este
+    // adaptador proporciona grant inmediato y rvalid +1 ciclo.
+    // =========================================================
+    dmem_legacy_compat u_dmem_legacy_compat (
+        .clk      (clk),
+        .rst      (rst),
+        .req_i    (dmem_req),
+        .gnt_o    (dmem_gnt),
+        .rvalid_o (dmem_rvalid),
+        .error_o  (dmem_error)
+    );
+
+    // =========================================================
+    // IMEM síncrona real
+    // =========================================================
+
+    imem_sync_model #(
+        .MEM_WORDS  (IMEM_WORDS),
+        .GNT_DELAY  (0),
+        .RESP_DELAY (1)
+    ) u_imem (
+        .clk      (clk),
+        .rst      (rst),
+
+        .req_i    (imem_req),
+        .gnt_o    (imem_gnt),
+        .addr_i   (imem_addr),
+
+        .rvalid_o (imem_rvalid),
+        .rdata_o  (imem_rdata)
+    );
+
     core_top #(
         .RESET_PC   (64'h0000_0000_0000_0000),
         .TRAP_VECTOR(64'h0000_0000_0000_0100),
@@ -75,10 +122,18 @@ module tb_core_expansion_priv_wait;
         .clk        (clk),
         .rst        (rst),
 
-        .imem_addr  (imem_addr),
-        .imem_rdata (imem_rdata),
+        .imem_req    (imem_req),
+        .imem_addr   (imem_addr),
+        .imem_gnt    (imem_gnt),
+        .imem_rvalid (imem_rvalid),
+        .imem_rdata  (imem_rdata),
 
         .dmem_rdata (dmem_rdata),
+
+        .dmem_req    (dmem_req),
+        .dmem_gnt    (dmem_gnt),
+        .dmem_rvalid (dmem_rvalid),
+        .dmem_error  (dmem_error),
         .dmem_we    (dmem_we),
         .dmem_wstrb (dmem_wstrb),
         .dmem_addr  (dmem_addr),
@@ -115,27 +170,41 @@ module tb_core_expansion_priv_wait;
     //
     // 0x0C+: NOP
     // ---------------------------------------------------------
-    always_comb begin
-        imem_rdata = 32'h0000_0013; // NOP
 
-        case (imem_addr)
-            64'h0000_0000_0000_0000:
-                imem_rdata = 32'h0000_10B7; // LUI x1, 0x1
+    // ---------------------------------------------------------
+    // Carga del programa correspondiente al escenario actual
+    // ---------------------------------------------------------
+    task automatic load_program;
+        integer i;
+        begin
 
-            64'h0000_0000_0000_0004:
-                imem_rdata = 32'h0000_B103; // LD x2, 0(x1)
-
-            64'h0000_0000_0000_0008: begin
-                if (scenario == SCENARIO_CSR)
-                    imem_rdata = 32'h3004_5073; // CSRRWI x0, mstatus, 8
-                else
-                    imem_rdata = 32'h3020_0073; // MRET
+            for (i = 0; i < IMEM_WORDS; i = i + 1) begin
+                u_imem.mem[i] = 32'h0000_0013; // NOP
             end
 
-            default:
-                imem_rdata = 32'h0000_0013;
-        endcase
-    end
+            // 0x00: LUI x1, 0x1
+            //       x1 = 0x1000
+            u_imem.mem[0] = 32'h0000_10B7;
+
+            // 0x04: LD x2, 0(x1)
+            //       acceso a expansión y wait-state
+            u_imem.mem[1] = 32'h0000_B103;
+
+            // 0x08: instrucción joven que debe permanecer
+            //       sin efectos mientras el LD espera.
+            if (scenario == SCENARIO_CSR) begin
+
+                // CSRRWI x0, mstatus, 8
+                u_imem.mem[2] = 32'h3004_5073;
+
+            end
+            else begin
+
+                // MRET
+                u_imem.mem[2] = 32'h3020_0073;
+            end
+        end
+    endtask
 
     // ---------------------------------------------------------
     // Reset común
@@ -147,6 +216,10 @@ module tb_core_expansion_priv_wait;
             exp_error = 1'b0;
             exp_rdata = 64'h1122_3344_5566_7788;
             dmem_rdata = 64'd0;
+
+            // Cargar el programa correspondiente al scenario actual
+            // mientras el frontend permanece en reset.
+            load_program();
 
             repeat (3) @(posedge clk);
 

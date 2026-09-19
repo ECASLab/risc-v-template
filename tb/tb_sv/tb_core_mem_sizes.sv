@@ -49,9 +49,14 @@
 
 module tb_core_mem_sizes;
 
+    localparam int unsigned IMEM_WORDS = 64;
+
     logic clk;
     logic rst;
 
+    logic        imem_req;
+    logic        imem_gnt;
+    logic        imem_rvalid;
     logic [63:0] imem_addr;
     logic [31:0] imem_rdata;
 
@@ -62,7 +67,12 @@ module tb_core_mem_sizes;
     logic [63:0] dmem_wdata;
     logic [1:0]  dmem_size;
 
-    logic [31:0] imem [0:63];
+    // Handshake de memoria de datos.
+    logic        dmem_req;
+    logic        dmem_gnt;
+    logic        dmem_rvalid;
+    logic        dmem_error;
+ 
     logic [63:0] dmem [0:63];
 
     // ------------------------------------------------------------
@@ -81,16 +91,60 @@ module tb_core_mem_sizes;
     integer i;
     integer b;
 
+    // =========================================================
+    // Adaptador temporal para los modelos combinacionales
+    // de memoria usados por este testbench.
+    //
+    // El core utiliza el handshake definitivo, mientras este
+    // adaptador proporciona grant inmediato y rvalid +1 ciclo.
+    // =========================================================
+    dmem_legacy_compat u_dmem_legacy_compat (
+        .clk      (clk),
+        .rst      (rst),
+        .req_i    (dmem_req),
+        .gnt_o    (dmem_gnt),
+        .rvalid_o (dmem_rvalid),
+        .error_o  (dmem_error)
+    );
+
+    // =========================================================
+    // IMEM síncrona
+    // =========================================================
+
+    imem_sync_model #(
+        .MEM_WORDS  (IMEM_WORDS),
+        .GNT_DELAY  (0),
+        .RESP_DELAY (1)
+    ) u_imem (
+        .clk      (clk),
+        .rst      (rst),
+
+        .req_i    (imem_req),
+        .gnt_o    (imem_gnt),
+        .addr_i   (imem_addr),
+
+        .rvalid_o (imem_rvalid),
+        .rdata_o  (imem_rdata)
+    );
+
     core_top #(
         .RESET_PC(64'd0)
     ) dut (
         .clk        (clk),
         .rst        (rst),
 
-        .imem_addr  (imem_addr),
-        .imem_rdata (imem_rdata),
+        .imem_req    (imem_req),
+        .imem_addr   (imem_addr),
+        .imem_gnt    (imem_gnt),
+        .imem_rvalid (imem_rvalid),
+        .imem_rdata  (imem_rdata),
 
         .dmem_rdata (dmem_rdata),
+
+        .dmem_req    (dmem_req),
+        .dmem_gnt    (dmem_gnt),
+        .dmem_rvalid (dmem_rvalid),
+        .dmem_error  (dmem_error),
         .dmem_we    (dmem_we),
         .dmem_wstrb (dmem_wstrb),
         .dmem_addr  (dmem_addr),
@@ -110,8 +164,7 @@ module tb_core_mem_sizes;
 
     initial clk = 1'b0;
     always #5 clk = ~clk;
-
-    assign imem_rdata = imem[imem_addr[7:2]];
+ 
     assign dmem_rdata = dmem[dmem_addr[8:3]];
 
     always @(posedge clk) begin
@@ -133,8 +186,8 @@ module tb_core_mem_sizes;
         rst = 1'b1;
 
         for (i = 0; i < 64; i = i + 1) begin
-            imem[i] = 32'h00000013; // nop
-            dmem[i] = 64'd0;
+            u_imem.mem[i] = 32'h00000013;
+            dmem[i]       = 64'd0;
         end
 
         // Precarga para pruebas de load
@@ -148,24 +201,24 @@ module tb_core_mem_sizes;
         // stores hacia dmem[1] y dmem[2]
         // loop final
 
-        imem[0]  = 32'h00000513; // addi x10, x0, 0
+        u_imem.mem[0]  = 32'h00000513; // addi x10, x0, 0
 
-        imem[1]  = 32'h00050083; // lb   x1, 0(x10)
-        imem[2]  = 32'h00054103; // lbu  x2, 0(x10)
-        imem[3]  = 32'h00251183; // lh   x3, 2(x10)
-        imem[4]  = 32'h00255203; // lhu  x4, 2(x10)
-        imem[5]  = 32'h00452283; // lw   x5, 4(x10)
-        imem[6]  = 32'h00456303; // lwu  x6, 4(x10)
-        imem[7]  = 32'h00053383; // ld   x7, 0(x10)
+        u_imem.mem[1]  = 32'h00050083; // lb   x1, 0(x10)
+        u_imem.mem[2]  = 32'h00054103; // lbu  x2, 0(x10)
+        u_imem.mem[3]  = 32'h00251183; // lh   x3, 2(x10)
+        u_imem.mem[4]  = 32'h00255203; // lhu  x4, 2(x10)
+        u_imem.mem[5]  = 32'h00452283; // lw   x5, 4(x10)
+        u_imem.mem[6]  = 32'h00456303; // lwu  x6, 4(x10)
+        u_imem.mem[7]  = 32'h00053383; // ld   x7, 0(x10)
 
-        imem[8]  = 32'hfff00593; // addi x11, x0, -1
+        u_imem.mem[8]  = 32'hfff00593; // addi x11, x0, -1
 
-        imem[9]  = 32'h00b00423; // sb   x11, 8(x0)
-        imem[10] = 32'h00b01523; // sh   x11, 10(x0)
-        imem[11] = 32'h00b02623; // sw   x11, 12(x0)
-        imem[12] = 32'h00b03823; // sd   x11, 16(x0)
+        u_imem.mem[9]  = 32'h00b00423; // sb   x11, 8(x0)
+        u_imem.mem[10] = 32'h00b01523; // sh   x11, 10(x0)
+        u_imem.mem[11] = 32'h00b02623; // sw   x11, 12(x0)
+        u_imem.mem[12] = 32'h00b03823; // sd   x11, 16(x0)
 
-        imem[13] = 32'h0000006f; // jal  x0, 0
+        u_imem.mem[13] = 32'h0000006f; // jal  x0, 0
 
         repeat (3) @(posedge clk);
         rst = 1'b0;

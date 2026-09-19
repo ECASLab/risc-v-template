@@ -33,6 +33,7 @@ VERILATOR ?= verilator
 
 BUILD_DIR := build
 TB_DIR    := tb/tb_sv
+TB_MODEL_DIR := tb/models
 RTL_DIR   := rtl/core
 
 EVID_DIR := docs/verification
@@ -83,7 +84,36 @@ RTL_FILES := \
 	$(RTL_DIR)/expansion_demo_periph.sv \
 	$(RTL_DIR)/axi4lite_expansion_demo_periph.sv \
 	$(RTL_DIR)/exp_axi4lite_master_bridge.sv \
+	$(RTL_DIR)/dmem_handshake_ctrl.sv \
+	$(RTL_DIR)/imem_handshake_ctrl.sv \
+	$(RTL_DIR)/dmem_legacy_compat.sv \
 	$(RTL_DIR)/core_top.sv
+
+
+# ------------------------------------------------------------
+# Modelos de verificación
+# ------------------------------------------------------------
+
+DMEM_SYNC_MODEL := $(TB_MODEL_DIR)/dmem_sync_model.sv
+IMEM_SYNC_MODEL := $(TB_MODEL_DIR)/imem_sync_model.sv
+
+# Tests que necesitan el modelo DMEM síncrono real.
+DMEM_SYNC_TESTS := \
+	tb_core_dmem_sync \
+	tb_core_dmem_sync_fault \
+	tb_core_dmem_sync_subword \
+	tb_core_smoke \
+	tb_core_hazards \
+	tb_core_hazard_branch \
+	tb_core_mem_misaligned_trap
+
+# ------------------------------------------------------------
+# Tests que necesitan el modelo IMEM síncrono
+# ------------------------------------------------------------
+
+IMEM_SYNC_TESTS := \
+	tb_imem_sync_model \
+	tb_core_imem_sync
 
 # ------------------------------------------------------------
 # Testbenches SystemVerilog
@@ -96,13 +126,13 @@ RTL_FILES := \
 TESTS := \
 	tb_alu_w \
 	tb_decoder_w \
-	tb_core_smoke \
+	tb_dmem_handshake_ctrl \
+	tb_imem_handshake_ctrl \
+	tb_dmem_legacy_compat \
+	$(DMEM_SYNC_TESTS) \
+	$(IMEM_SYNC_TESTS) \
 	tb_core_jump \
-	tb_core_mem_sizes \
-	tb_core_mem_misaligned_trap \
-	tb_core_hazards \
 	tb_core_mtval \
-	tb_core_hazard_branch \
 	tb_core_system_trap \
 	tb_core_csr_ops \
 	tb_core_ebreak_trap \
@@ -122,7 +152,106 @@ TESTS := \
 	tb_core_expansion_axi4lite_load_fault \
 	tb_core_expansion_axi4lite_store_fault
 
-LINT_TESTS := $(addprefix lint_,$(TESTS))
+# ------------------------------------------------------------
+# Testbenches legacy
+#
+# Se conservan para trazabilidad y ejecución manual, pero no
+# forman parte de la regresión funcional obligatoria.
+#
+# tb_core_mem_sizes fue reemplazado funcionalmente por
+# tb_core_dmem_sync_subword, que además verifica el handshake
+# DMEM síncrono, wait-states, offsets, wstrb y wdata.
+# ------------------------------------------------------------
+
+LEGACY_TESTS := \
+	tb_core_mem_sizes
+
+# Solo estos TB necesitan compilar el modelo de DMEM síncrona.
+$(DMEM_SYNC_TESTS): EXTRA_TB_SRCS := $(DMEM_SYNC_MODEL)
+$(addprefix lint_,$(DMEM_SYNC_TESTS)): EXTRA_TB_SRCS := $(DMEM_SYNC_MODEL)
+
+$(IMEM_SYNC_TESTS): EXTRA_TB_SRCS := $(IMEM_SYNC_MODEL)
+$(addprefix lint_,$(IMEM_SYNC_TESTS)): EXTRA_TB_SRCS := $(IMEM_SYNC_MODEL)
+
+# tb_core_hazard_branch utiliza simultáneamente DMEM e IMEM
+# síncronas reales.
+tb_core_hazard_branch: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_hazard_branch: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_jump: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_jump: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_system_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_system_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_ebreak_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_ebreak_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_illegal_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_illegal_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_branch_misaligned_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_branch_misaligned_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_jal_misaligned_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_jal_misaligned_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_jalr_misaligned_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_jalr_misaligned_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_mtval: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_mtval: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_csr_ops: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_csr_ops: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_mem_misaligned_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_mem_misaligned_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_smoke: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_smoke: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_hazards: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_hazards: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_dmem_sync: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_dmem_sync: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_dmem_sync_fault: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_dmem_sync_fault: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_dmem_sync_subword: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_dmem_sync_subword: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_directed: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_directed: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_expansion_mmio: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_expansion_mmio: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_expansion_fault_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_expansion_fault_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_expansion_store_fault_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_expansion_store_fault_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_expansion_axi4lite_wait: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_expansion_axi4lite_wait: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_expansion_axi4lite_load_fault: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_expansion_axi4lite_load_fault: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_expansion_axi4lite_store_fault: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_expansion_axi4lite_store_fault: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_expansion_priv_wait: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_expansion_priv_wait: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_mem_sizes: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_mem_sizes: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+ALL_TESTS  := $(TESTS) $(LEGACY_TESTS)
+LINT_TESTS := $(addprefix lint_,$(ALL_TESTS))
 
 # ------------------------------------------------------------
 # Targets phony
@@ -134,7 +263,7 @@ LINT_TESTS := $(addprefix lint_,$(TESTS))
 	run-one list-tests \
 	evidence_dirs regress-log \
 	clean clean-vcd \
-	$(TESTS) $(LINT_TESTS)
+	$(ALL_TESTS) $(LINT_TESTS)
 
 # ------------------------------------------------------------
 # Target por defecto
@@ -199,7 +328,7 @@ list-tests:
 # Simulación individual
 # ------------------------------------------------------------
 
-$(TESTS): check-tools $(BUILD_DIR)
+$(ALL_TESTS): check-tools $(BUILD_DIR)
 > @echo "============================================================"
 > @echo "TEST: $@"
 > @echo "============================================================"
@@ -211,6 +340,7 @@ $(TESTS): check-tools $(BUILD_DIR)
 > 	-s $@ \
 > 	-o $(BUILD_DIR)/$@.vvp \
 > 	$(RTL_FILES) \
+> 	$(EXTRA_TB_SRCS) \
 > 	$(TB_DIR)/$@.sv
 > @set -o pipefail; \
 > $(VVP) $(BUILD_DIR)/$@.vvp | tee $(BUILD_DIR)/$@.log; \
@@ -285,6 +415,7 @@ $(LINT_TESTS): lint_%: check-verilator
 >@$(VERILATOR) $(VERILATOR_TB_FLAGS) \
 > 	--top-module $* \
 > 	$(RTL_FILES) \
+> 	$(EXTRA_TB_SRCS) \
 > 	$(TB_DIR)/$*.sv
 > @echo "============================================================"
 > @echo "PASS: lint $* completado"

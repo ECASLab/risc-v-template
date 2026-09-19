@@ -9,6 +9,15 @@ module tb_core_jal_misaligned_trap;
     logic        clk;
     logic        rst;
 
+    // ============================================================
+    // IMEM síncrona
+    // ============================================================
+
+    localparam int unsigned IMEM_WORDS = 256;
+
+    logic        imem_req;
+    logic        imem_gnt;
+    logic        imem_rvalid;
     logic [63:0] imem_addr;
     logic [31:0] imem_rdata;
 
@@ -18,6 +27,12 @@ module tb_core_jal_misaligned_trap;
     logic [63:0] dmem_addr;
     logic [63:0] dmem_wdata;
     logic [1:0]  dmem_size;
+
+    // Handshake de memoria de datos.
+    logic        dmem_req;
+    logic        dmem_gnt;
+    logic        dmem_rvalid;
+    logic        dmem_error;
 
     // ------------------------------------------------------------
     // Señales dummy para puerto de expansión.
@@ -32,107 +47,151 @@ module tb_core_jal_misaligned_trap;
     assign exp_rdata = 64'd0;
     assign exp_error = 1'b0;
 
-    // ============================================================
-    // Memoria de instrucciones
-    // ============================================================
-
-    logic [31:0] imem [0:255];
-
-    assign imem_rdata = imem[imem_addr[9:2]];
     assign dmem_rdata = 64'd0;
 
     // ============================================================
     // DUT
     // ============================================================
 
-    core_top dut (
-        .clk        (clk),
-        .rst        (rst),
+    // ============================================================
+    // IMEM síncrona real
+    //
+    // Configuración rápida ya validada:
+    //   GNT_DELAY  = 0
+    //   RESP_DELAY = 1
+    //
+    // Controlador y modelo soportan turnover, permitiendo
+    // un fetch/ciclo después del llenado inicial.
+    // ============================================================ 
 
-        .imem_addr  (imem_addr),
-        .imem_rdata (imem_rdata),
+        imem_sync_model #(
+            .MEM_WORDS  (IMEM_WORDS),
+            .GNT_DELAY  (0),
+            .RESP_DELAY (1)
+        ) u_imem (
+            .clk      (clk),
+            .rst      (rst),
 
-        .dmem_rdata (dmem_rdata),
-        .dmem_we    (dmem_we),
-        .dmem_wstrb (dmem_wstrb),
-        .dmem_addr  (dmem_addr),
-        .dmem_wdata (dmem_wdata),
-        .dmem_size  (dmem_size),
+            .req_i    (imem_req),
+            .gnt_o    (imem_gnt),
+            .addr_i   (imem_addr),
 
-        .exp_valid  (),
-        .exp_we     (),
-        .exp_addr   (),
-        .exp_wdata  (),
-        .exp_wstrb  (),
-        .exp_size   (),
-        .exp_ready  (exp_ready),
-        .exp_rdata  (exp_rdata),
-        .exp_error  (exp_error)
-    );
+            .rvalid_o (imem_rvalid),
+            .rdata_o  (imem_rdata)
+        );
+
+    // =========================================================
+    // Adaptador temporal para los modelos combinacionales
+    // de memoria usados por este testbench.
+    //
+    // El core utiliza el handshake definitivo, mientras este
+    // adaptador proporciona grant inmediato y rvalid +1 ciclo.
+    // =========================================================
+        dmem_legacy_compat u_dmem_legacy_compat (
+            .clk      (clk),
+            .rst      (rst),
+            .req_i    (dmem_req),
+            .gnt_o    (dmem_gnt),
+            .rvalid_o (dmem_rvalid),
+            .error_o  (dmem_error)
+        );
+
+        core_top dut (
+            .clk        (clk),
+            .rst        (rst),
+
+            .imem_req    (imem_req),
+            .imem_addr   (imem_addr),
+            .imem_gnt    (imem_gnt),
+            .imem_rvalid (imem_rvalid),
+            .imem_rdata  (imem_rdata),
+
+            .dmem_rdata (dmem_rdata),
+
+            .dmem_req    (dmem_req),
+            .dmem_gnt    (dmem_gnt),
+            .dmem_rvalid (dmem_rvalid),
+            .dmem_error  (dmem_error),
+            .dmem_we    (dmem_we),
+            .dmem_wstrb (dmem_wstrb),
+            .dmem_addr  (dmem_addr),
+            .dmem_wdata (dmem_wdata),
+            .dmem_size  (dmem_size),
+
+            .exp_valid  (),
+            .exp_we     (),
+            .exp_addr   (),
+            .exp_wdata  (),
+            .exp_wstrb  (),
+            .exp_size   (),
+            .exp_ready  (exp_ready),
+            .exp_rdata  (exp_rdata),
+            .exp_error  (exp_error)
+        );
 
     // ============================================================
     // Clock
     // ============================================================
 
-    initial begin
-        clk = 1'b0;
-        forever #5 clk = ~clk;
-    end
+        initial begin
+            clk = 1'b0;
+            forever #5 clk = ~clk;
+        end
 
     // ============================================================
     // Encoders mínimos
     // ============================================================
 
-    localparam logic [11:0] CSR_MTVEC  = 12'h305;
-    localparam logic [11:0] CSR_MEPC   = 12'h341;
-    localparam logic [11:0] CSR_MCAUSE = 12'h342;
+        localparam logic [11:0] CSR_MTVEC  = 12'h305;
+        localparam logic [11:0] CSR_MEPC   = 12'h341;
+        localparam logic [11:0] CSR_MCAUSE = 12'h342;
 
-    localparam logic [2:0] F3_CSRRW = 3'b001;
-    localparam logic [2:0] F3_CSRRS = 3'b010;
+        localparam logic [2:0] F3_CSRRW = 3'b001;
+        localparam logic [2:0] F3_CSRRS = 3'b010;
 
-    localparam logic [31:0] INSTR_MRET      = 32'h3020_0073;
-    localparam logic [31:0] INSTR_HALT_LOOP = 32'h0000_006f; // jal x0, 0
+        localparam logic [31:0] INSTR_MRET      = 32'h3020_0073;
+        localparam logic [31:0] INSTR_HALT_LOOP = 32'h0000_006f; // jal x0, 0
 
-    function automatic logic [31:0] enc_addi(
-        input logic [4:0]  rd,
-        input logic [4:0]  rs1,
-        input logic [11:0] imm
-    );
-        enc_addi = {imm, rs1, 3'b000, rd, 7'b0010011};
-    endfunction
+        function automatic logic [31:0] enc_addi(
+            input logic [4:0]  rd,
+            input logic [4:0]  rs1,
+            input logic [11:0] imm
+        );
+            enc_addi = {imm, rs1, 3'b000, rd, 7'b0010011};
+        endfunction
 
-    function automatic logic [31:0] enc_csr(
-        input logic [11:0] csr,
-        input logic [4:0]  rs1_or_uimm,
-        input logic [2:0]  funct3,
-        input logic [4:0]  rd
-    );
-        enc_csr = {csr, rs1_or_uimm, funct3, rd, 7'b1110011};
-    endfunction
+        function automatic logic [31:0] enc_csr(
+            input logic [11:0] csr,
+            input logic [4:0]  rs1_or_uimm,
+            input logic [2:0]  funct3,
+            input logic [4:0]  rd
+        );
+            enc_csr = {csr, rs1_or_uimm, funct3, rd, 7'b1110011};
+        endfunction
 
-    function automatic logic [31:0] enc_jal(
-        input logic [4:0]  rd,
-        input logic [20:0] imm
-    );
-        // Formato J:
-        // imm[20]    -> bit 31
-        // imm[10:1]  -> bits 30:21
-        // imm[11]    -> bit 20
-        // imm[19:12] -> bits 19:12
-        // bit 0 no se codifica; siempre es 0.
-        enc_jal = {
-            imm[20],
-            imm[10:1],
-            imm[11],
-            imm[19:12],
-            rd,
-            7'b1101111
-        };
-    endfunction
+        function automatic logic [31:0] enc_jal(
+            input logic [4:0]  rd,
+            input logic [20:0] imm
+        );
+            // Formato J:
+            // imm[20]    -> bit 31
+            // imm[10:1]  -> bits 30:21
+            // imm[11]    -> bit 20
+            // imm[19:12] -> bits 19:12
+            // bit 0 no se codifica; siempre es 0.
+            enc_jal = {
+                imm[20],
+                imm[10:1],
+                imm[11],
+                imm[19:12],
+                rd,
+                7'b1101111
+            };
+        endfunction
 
-    function automatic logic [31:0] enc_nop();
-        enc_nop = enc_addi(5'd0, 5'd0, 12'd0);
-    endfunction
+        function automatic logic [31:0] enc_nop();
+            enc_nop = enc_addi(5'd0, 5'd0, 12'd0);
+        endfunction
 
     // ============================================================
     // Programa
@@ -157,54 +216,54 @@ module tb_core_jal_misaligned_trap;
 
     initial begin
         for (i = 0; i < 256; i = i + 1) begin
-            imem[i] = enc_nop();
+            u_imem.mem[i] = enc_nop();
         end
 
         // ----------------------------
         // Programa principal
         // ----------------------------
 
-        imem[0] = enc_addi(5'd1, 5'd0, 12'h040);                    // x1 = 0x40
-        imem[1] = enc_csr(CSR_MTVEC, 5'd1, F3_CSRRW, 5'd0);         // mtvec = x1
-        imem[2] = enc_nop();
-        imem[3] = enc_nop();
+        u_imem.mem[0] = enc_addi(5'd1, 5'd0, 12'h040);                    // x1 = 0x40
+        u_imem.mem[1] = enc_csr(CSR_MTVEC, 5'd1, F3_CSRRW, 5'd0);         // mtvec = x1
+        u_imem.mem[2] = enc_nop();
+        u_imem.mem[3] = enc_nop();
 
         // PC = 0x10
         // Target = 0x10 + 6 = 0x16, desalineado a 4 bytes.
         // JAL es salto incondicional, entonces debe generar trap.
-        imem[4] = enc_jal(5'd0, 21'd6);                             // jal x0, +6
+        u_imem.mem[4] = enc_jal(5'd0, 21'd6);                             // jal x0, +6
 
         // PC = 0x14
-        imem[5] = enc_addi(5'd5, 5'd0, 12'h123);                    // x5 = 0x123
+        u_imem.mem[5] = enc_addi(5'd5, 5'd0, 12'h123);                    // x5 = 0x123
 
         // PC = 0x18
-        imem[6] = enc_addi(5'd6, 5'd0, 12'h456);                    // x6 = 0x456
+        u_imem.mem[6] = enc_addi(5'd6, 5'd0, 12'h456);                    // x6 = 0x456
 
         // PC = 0x1c
-        imem[7] = INSTR_HALT_LOOP;                                  // detener aquí
+        u_imem.mem[7] = INSTR_HALT_LOOP;                                  // detener aquí
 
         // ----------------------------
         // Handler en mtvec = 0x40
         // índice = 0x40 / 4 = 16
         // ----------------------------
 
-        imem[16] = enc_csr(CSR_MCAUSE, 5'd0, F3_CSRRS, 5'd20);      // x20 = mcause
-        imem[17] = enc_csr(CSR_MEPC,   5'd0, F3_CSRRS, 5'd21);      // x21 = mepc
+        u_imem.mem[16] = enc_csr(CSR_MCAUSE, 5'd0, F3_CSRRS, 5'd20);      // x20 = mcause
+        u_imem.mem[17] = enc_csr(CSR_MEPC,   5'd0, F3_CSRRS, 5'd21);      // x21 = mepc
 
-        imem[18] = enc_nop();
-        imem[19] = enc_nop();
+        u_imem.mem[18] = enc_nop();
+        u_imem.mem[19] = enc_nop();
 
-        imem[20] = enc_addi(5'd22, 5'd21, 12'd4);                   // x22 = mepc + 4
+        u_imem.mem[20] = enc_addi(5'd22, 5'd21, 12'd4);                   // x22 = mepc + 4
 
-        imem[21] = enc_nop();
-        imem[22] = enc_nop();
+        u_imem.mem[21] = enc_nop();
+        u_imem.mem[22] = enc_nop();
 
-        imem[23] = enc_csr(CSR_MEPC, 5'd22, F3_CSRRW, 5'd0);        // mepc = x22
+        u_imem.mem[23] = enc_csr(CSR_MEPC, 5'd22, F3_CSRRW, 5'd0);        // mepc = x22
 
-        imem[24] = enc_nop();
-        imem[25] = enc_nop();
+        u_imem.mem[24] = enc_nop();
+        u_imem.mem[25] = enc_nop();
 
-        imem[26] = INSTR_MRET;                                      // return to 0x14
+        u_imem.mem[26] = INSTR_MRET;                                      // return to 0x14
     end
 
     // ============================================================

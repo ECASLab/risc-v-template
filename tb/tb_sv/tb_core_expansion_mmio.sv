@@ -15,10 +15,7 @@ module tb_core_expansion_mmio;
 
     localparam integer IMEM_WORDS = 256;
     localparam integer DMEM_WORDS = 1024;
-
-    // Número de bits necesarios para indexar las 256 palabras
-    // de la memoria de instrucciones.
-    localparam integer IMEM_INDEX_BITS = $clog2(IMEM_WORDS);
+ 
 
     // Opcodes RISC-V usados por el programa dirigido
     localparam logic [6:0] OPCODE_LUI    = 7'b0110111;
@@ -36,6 +33,9 @@ module tb_core_expansion_mmio;
     logic clk;
     logic rst;
 
+    logic        imem_req;
+    logic        imem_gnt;
+    logic        imem_rvalid;
     logic [63:0] imem_addr;
     logic [31:0] imem_rdata;
 
@@ -46,6 +46,12 @@ module tb_core_expansion_mmio;
     logic [63:0] dmem_wdata;
     logic [1:0]  dmem_size;
 
+    // Handshake de memoria de datos.
+    logic        dmem_req;
+    logic        dmem_gnt;
+    logic        dmem_rvalid;
+    logic        dmem_error;
+
     logic        exp_valid;
     logic        exp_we;
     logic [63:0] exp_addr;
@@ -55,11 +61,9 @@ module tb_core_expansion_mmio;
     logic        exp_ready;
     logic [63:0] exp_rdata;
     logic        exp_error;
-
-    logic [31:0] instr_mem [0:IMEM_WORDS-1];
+ 
     logic [63:0] data_mem  [0:DMEM_WORDS-1];
-
-    logic [9:0] imem_index;
+ 
     logic [9:0] dmem_index;
 
 
@@ -81,152 +85,187 @@ module tb_core_expansion_mmio;
     // Ensambladores mínimos para instrucciones usadas por el TB
     // =========================================================
 
-    function automatic [31:0] enc_lui;
-        input [4:0]  rd;
-        input [19:0] imm20;
-        begin
-            enc_lui = {imm20, rd, OPCODE_LUI};
-        end
-    endfunction
+        function automatic [31:0] enc_lui;
+            input [4:0]  rd;
+            input [19:0] imm20;
+            begin
+                enc_lui = {imm20, rd, OPCODE_LUI};
+            end
+        endfunction
 
-    function automatic [31:0] enc_i;
-        input [11:0] imm12;
-        input [4:0]  rs1;
-        input [2:0]  funct3;
-        input [4:0]  rd;
-        input [6:0]  opcode;
-        begin
-            enc_i = {imm12, rs1, funct3, rd, opcode};
-        end
-    endfunction
+        function automatic [31:0] enc_i;
+            input [11:0] imm12;
+            input [4:0]  rs1;
+            input [2:0]  funct3;
+            input [4:0]  rd;
+            input [6:0]  opcode;
+            begin
+                enc_i = {imm12, rs1, funct3, rd, opcode};
+            end
+        endfunction
 
-    function automatic [31:0] enc_s;
-        input [11:0] imm12;
-        input [4:0]  rs2;
-        input [4:0]  rs1;
-        input [2:0]  funct3;
-        begin
-            enc_s = {imm12[11:5], rs2, rs1, funct3, imm12[4:0], OPCODE_STORE};
-        end
-    endfunction
+        function automatic [31:0] enc_s;
+            input [11:0] imm12;
+            input [4:0]  rs2;
+            input [4:0]  rs1;
+            input [2:0]  funct3;
+            begin
+                enc_s = {imm12[11:5], rs2, rs1, funct3, imm12[4:0], OPCODE_STORE};
+            end
+        endfunction
 
-    function automatic [31:0] enc_jal;
-        input [4:0]  rd;
-        input [20:0] imm21;
-        begin
-            enc_jal = {
-                imm21[20],
-                imm21[10:1],
-                imm21[11],
-                imm21[19:12],
-                rd,
-                OPCODE_JAL
-            };
-        end
-    endfunction
+        function automatic [31:0] enc_jal;
+            input [4:0]  rd;
+            input [20:0] imm21;
+            begin
+                enc_jal = {
+                    imm21[20],
+                    imm21[10:1],
+                    imm21[11],
+                    imm21[19:12],
+                    rd,
+                    OPCODE_JAL
+                };
+            end
+        endfunction
 
-    function automatic is_exp_region;
-        input [63:0] addr;
-        begin
-            is_exp_region = ((addr & EXP_MASK) == (EXP_BASE & EXP_MASK));
-        end
-    endfunction
+        function automatic is_exp_region;
+            input [63:0] addr;
+            begin
+                is_exp_region = ((addr & EXP_MASK) == (EXP_BASE & EXP_MASK));
+            end
+        endfunction
 
     // =========================================================
     // DUT: core + periférico de expansión
     // =========================================================
 
-    core_top #(
-        .RESET_PC    (64'd0),
-        .TRAP_VECTOR (64'h0000_0000_0000_0100),
-        .EXP_BASE    (EXP_BASE),
-        .EXP_MASK    (EXP_MASK)
-    ) dut (
-        .clk        (clk),
-        .rst        (rst),
+    // =========================================================
+    // Adaptador temporal para los modelos combinacionales
+    // de memoria usados por este testbench.
+    //
+    // El core utiliza el handshake definitivo, mientras este
+    // adaptador proporciona grant inmediato y rvalid +1 ciclo.
+    // =========================================================
+        dmem_legacy_compat u_dmem_legacy_compat (
+            .clk      (clk),
+            .rst      (rst),
+            .req_i    (dmem_req),
+            .gnt_o    (dmem_gnt),
+            .rvalid_o (dmem_rvalid),
+            .error_o  (dmem_error)
+        );
 
-        .imem_addr  (imem_addr),
-        .imem_rdata (imem_rdata),
+    // =========================================================
+    // IMEM síncrona real
+    //
+    // Configuración rápida ya validada:
+    //   GNT_DELAY  = 0
+    //   RESP_DELAY = 1
+    // =========================================================
 
-        .dmem_rdata (dmem_rdata),
-        .dmem_we    (dmem_we),
-        .dmem_wstrb (dmem_wstrb),
-        .dmem_addr  (dmem_addr),
-        .dmem_wdata (dmem_wdata),
-        .dmem_size  (dmem_size),
+        imem_sync_model #(
+            .MEM_WORDS  (IMEM_WORDS),
+            .GNT_DELAY  (0),
+            .RESP_DELAY (1)
+        ) u_imem (
+            .clk      (clk),
+            .rst      (rst),
 
-        .exp_valid  (exp_valid),
-        .exp_we     (exp_we),
-        .exp_addr   (exp_addr),
-        .exp_wdata  (exp_wdata),
-        .exp_wstrb  (exp_wstrb),
-        .exp_size   (exp_size),
-        .exp_ready  (exp_ready),
-        .exp_rdata  (exp_rdata),
-        .exp_error  (exp_error)
-    );
+            .req_i    (imem_req),
+            .gnt_o    (imem_gnt),
+            .addr_i   (imem_addr),
 
-    expansion_demo_periph u_expansion_demo_periph (
-        .clk         (clk),
-        .rst         (rst),
+            .rvalid_o (imem_rvalid),
+            .rdata_o  (imem_rdata)
+        );
 
-        .exp_valid_i (exp_valid),
-        .exp_we_i    (exp_we),
-        .exp_addr_i  (exp_addr),
-        .exp_wdata_i (exp_wdata),
-        .exp_wstrb_i (exp_wstrb),
-        .exp_size_i  (exp_size),
+    // =========================================================
+    // core + periférico de expansión
+    // =========================================================
+        core_top #(
+            .RESET_PC    (64'd0),
+            .TRAP_VECTOR (64'h0000_0000_0000_0100),
+            .EXP_BASE    (EXP_BASE),
+            .EXP_MASK    (EXP_MASK)
+        ) dut (
+            .clk        (clk),
+            .rst        (rst),
 
-        .exp_ready_o (exp_ready),
-        .exp_rdata_o (exp_rdata),
-        .exp_error_o (exp_error)
-    );
+            .imem_req    (imem_req),
+            .imem_addr   (imem_addr),
+            .imem_gnt    (imem_gnt),
+            .imem_rvalid (imem_rvalid),
+            .imem_rdata  (imem_rdata),
+
+            .dmem_rdata (dmem_rdata),
+
+            .dmem_req    (dmem_req),
+            .dmem_gnt    (dmem_gnt),
+            .dmem_rvalid (dmem_rvalid),
+            .dmem_error  (dmem_error),
+            .dmem_we    (dmem_we),
+            .dmem_wstrb (dmem_wstrb),
+            .dmem_addr  (dmem_addr),
+            .dmem_wdata (dmem_wdata),
+            .dmem_size  (dmem_size),
+
+            .exp_valid  (exp_valid),
+            .exp_we     (exp_we),
+            .exp_addr   (exp_addr),
+            .exp_wdata  (exp_wdata),
+            .exp_wstrb  (exp_wstrb),
+            .exp_size   (exp_size),
+            .exp_ready  (exp_ready),
+            .exp_rdata  (exp_rdata),
+            .exp_error  (exp_error)
+        );
+
+        expansion_demo_periph u_expansion_demo_periph (
+            .clk         (clk),
+            .rst         (rst),
+
+            .exp_valid_i (exp_valid),
+            .exp_we_i    (exp_we),
+            .exp_addr_i  (exp_addr),
+            .exp_wdata_i (exp_wdata),
+            .exp_wstrb_i (exp_wstrb),
+            .exp_size_i  (exp_size),
+
+            .exp_ready_o (exp_ready),
+            .exp_rdata_o (exp_rdata),
+            .exp_error_o (exp_error)
+        );
 
     // =========================================================
     // Reloj
     // =========================================================
 
-    initial begin
-        clk = 1'b0;
-        forever #5 clk = ~clk;
-    end
-
-    // =========================================================
-    // Memoria de instrucciones combinacional
-    // =========================================================
-
-    assign imem_index = imem_addr[11:2];
-
-    always @* begin
-        if (imem_index < 10'(IMEM_WORDS)) begin
-            imem_rdata = instr_mem[
-                imem_index[IMEM_INDEX_BITS-1:0]
-            ];
+        initial begin
+            clk = 1'b0;
+            forever #5 clk = ~clk;
         end
-        else begin
-            imem_rdata = 32'h0000_0013; // NOP = addi x0, x0, 0
-        end
-    end
+ 
 
     // =========================================================
     // Memoria de datos simple
     // =========================================================
 
-    assign dmem_index = dmem_addr[12:3];
+        assign dmem_index = dmem_addr[12:3];
 
-    always @* begin
-        dmem_rdata = data_mem[dmem_index];
-    end
+        always @* begin
+            dmem_rdata = data_mem[dmem_index];
+        end
 
-    always @(posedge clk) begin
-        if (!rst && dmem_we) begin
-            for (b = 0; b < 8; b = b + 1) begin
-                if (dmem_wstrb[b]) begin
-                    data_mem[dmem_addr[12:3]][b*8 +: 8] <= dmem_wdata[b*8 +: 8];
+        always @(posedge clk) begin
+            if (!rst && dmem_we) begin
+                for (b = 0; b < 8; b = b + 1) begin
+                    if (dmem_wstrb[b]) begin
+                        data_mem[dmem_addr[12:3]][b*8 +: 8] <= dmem_wdata[b*8 +: 8];
+                    end
                 end
             end
         end
-    end
 
     // =========================================================
     // Programa dirigido en RV64I
@@ -235,7 +274,7 @@ module tb_core_expansion_mmio;
     task automatic load_program;
         begin
             for (i = 0; i < IMEM_WORDS; i = i + 1) begin
-                instr_mem[i] = 32'h0000_0013; // NOP
+                u_imem.mem[i] = 32'h0000_0013;
             end
 
             for (i = 0; i < DMEM_WORDS; i = i + 1) begin
@@ -262,24 +301,24 @@ module tb_core_expansion_mmio;
             //   lui  x10, 0x40000
             //   slli x10, x10, 1
 
-            instr_mem[0]  = enc_lui(5'd10, 20'h40000);                         // lui  x10, 0x40000
-            instr_mem[1]  = enc_i  (12'h001, 5'd10, F3_SLLI, 5'd10, OPCODE_OP_IMM); // slli x10, x10, 1
+            u_imem.mem[0]  = enc_lui(5'd10, 20'h40000);                         // lui  x10, 0x40000
+            u_imem.mem[1]  = enc_i  (12'h001, 5'd10, F3_SLLI, 5'd10, OPCODE_OP_IMM); // slli x10, x10, 1
 
-            instr_mem[2]  = enc_i  (12'h011, 5'd0,  F3_ADDI, 5'd11, OPCODE_OP_IMM); // addi x11, x0, 0x11
-            instr_mem[3]  = enc_s  (12'h020, 5'd11, 5'd10, F3_SD);                  // sd   x11, 0x20(x10)
+            u_imem.mem[2]  = enc_i  (12'h011, 5'd0,  F3_ADDI, 5'd11, OPCODE_OP_IMM); // addi x11, x0, 0x11
+            u_imem.mem[3]  = enc_s  (12'h020, 5'd11, 5'd10, F3_SD);                  // sd   x11, 0x20(x10)
 
-            instr_mem[4]  = enc_i  (12'h022, 5'd0,  F3_ADDI, 5'd12, OPCODE_OP_IMM); // addi x12, x0, 0x22
-            instr_mem[5]  = enc_s  (12'h028, 5'd12, 5'd10, F3_SD);                  // sd   x12, 0x28(x10)
+            u_imem.mem[4]  = enc_i  (12'h022, 5'd0,  F3_ADDI, 5'd12, OPCODE_OP_IMM); // addi x12, x0, 0x22
+            u_imem.mem[5]  = enc_s  (12'h028, 5'd12, 5'd10, F3_SD);                  // sd   x12, 0x28(x10)
 
-            instr_mem[6]  = enc_i  (12'h001, 5'd0,  F3_ADDI, 5'd13, OPCODE_OP_IMM); // addi x13, x0, 1
-            instr_mem[7]  = enc_s  (12'h010, 5'd13, 5'd10, F3_SD);                  // sd   x13, 0x10(x10)
+            u_imem.mem[6]  = enc_i  (12'h001, 5'd0,  F3_ADDI, 5'd13, OPCODE_OP_IMM); // addi x13, x0, 1
+            u_imem.mem[7]  = enc_s  (12'h010, 5'd13, 5'd10, F3_SD);                  // sd   x13, 0x10(x10)
 
-            instr_mem[8]  = enc_i  (12'h030, 5'd10, F3_LD,   5'd14, OPCODE_LOAD);   // ld   x14, 0x30(x10)
+            u_imem.mem[8]  = enc_i  (12'h030, 5'd10, F3_LD,   5'd14, OPCODE_LOAD);   // ld   x14, 0x30(x10)
 
-            instr_mem[9]  = enc_i  (12'h200, 5'd0,  F3_ADDI, 5'd15, OPCODE_OP_IMM); // addi x15, x0, 0x200
-            instr_mem[10] = enc_s  (12'h000, 5'd14, 5'd15, F3_SD);                  // sd   x14, 0(x15)
+            u_imem.mem[9]  = enc_i  (12'h200, 5'd0,  F3_ADDI, 5'd15, OPCODE_OP_IMM); // addi x15, x0, 0x200
+            u_imem.mem[10] = enc_s  (12'h000, 5'd14, 5'd15, F3_SD);                  // sd   x14, 0(x15)
 
-            instr_mem[11] = enc_jal(5'd0, 21'd0);                                   // jal  x0, 0
+            u_imem.mem[11] = enc_jal(5'd0, 21'd0);                                   // jal  x0, 0
         end
     endtask
 

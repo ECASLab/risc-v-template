@@ -9,6 +9,15 @@ module tb_core_jalr_misaligned_trap;
     logic        clk;
     logic        rst;
 
+    // =========================================================
+    // IMEM síncrona
+    // =========================================================
+
+    localparam int unsigned IMEM_WORDS = 256;
+
+    logic        imem_req;
+    logic        imem_gnt;
+    logic        imem_rvalid;
     logic [63:0] imem_addr;
     logic [31:0] imem_rdata;
 
@@ -19,7 +28,11 @@ module tb_core_jalr_misaligned_trap;
     logic [63:0] dmem_wdata;
     logic [1:0]  dmem_size;
 
-    logic [31:0] imem [0:255];
+    // Handshake de memoria de datos.
+    logic        dmem_req;
+    logic        dmem_gnt;
+    logic        dmem_rvalid;
+    logic        dmem_error; 
 
     // ------------------------------------------------------------
     // Señales dummy para puerto de expansión.
@@ -40,54 +53,96 @@ module tb_core_jalr_misaligned_trap;
     // =========================================================
     // DUT
     // =========================================================
-    core_top #(
-        .RESET_PC    (64'd0),
-        .TRAP_VECTOR (64'h0000_0000_0000_0100)
-    ) dut (
-        .clk        (clk),
-        .rst        (rst),
+    // =========================================================
+    // Adaptador temporal para los modelos combinacionales
+    // de memoria usados por este testbench.
+    //
+    // El core utiliza el handshake definitivo, mientras este
+    // adaptador proporciona grant inmediato y rvalid +1 ciclo.
+    // =========================================================
+        dmem_legacy_compat u_dmem_legacy_compat (
+            .clk      (clk),
+            .rst      (rst),
+            .req_i    (dmem_req),
+            .gnt_o    (dmem_gnt),
+            .rvalid_o (dmem_rvalid),
+            .error_o  (dmem_error)
+        );
 
-        .imem_addr  (imem_addr),
-        .imem_rdata (imem_rdata),
+        core_top #(
+            .RESET_PC    (64'd0),
+            .TRAP_VECTOR (64'h0000_0000_0000_0100)
+        ) dut (
+            .clk        (clk),
+            .rst        (rst),
 
-        .dmem_rdata (dmem_rdata),
-        .dmem_we    (dmem_we),
-        .dmem_wstrb (dmem_wstrb),
-        .dmem_addr  (dmem_addr),
-        .dmem_wdata (dmem_wdata),
-        .dmem_size  (dmem_size),
+            .imem_req    (imem_req),
+            .imem_addr   (imem_addr),
+            .imem_gnt    (imem_gnt),
+            .imem_rvalid (imem_rvalid),
+            .imem_rdata  (imem_rdata),
 
-        .exp_valid  (),
-        .exp_we     (),
-        .exp_addr   (),
-        .exp_wdata  (),
-        .exp_wstrb  (),
-        .exp_size   (),
-        .exp_ready  (exp_ready),
-        .exp_rdata  (exp_rdata),
-        .exp_error  (exp_error)
-    );
+            .dmem_rdata (dmem_rdata),
+
+            .dmem_req    (dmem_req),
+            .dmem_gnt    (dmem_gnt),
+            .dmem_rvalid (dmem_rvalid),
+            .dmem_error  (dmem_error),
+            .dmem_we    (dmem_we),
+            .dmem_wstrb (dmem_wstrb),
+            .dmem_addr  (dmem_addr),
+            .dmem_wdata (dmem_wdata),
+            .dmem_size  (dmem_size),
+
+            .exp_valid  (),
+            .exp_we     (),
+            .exp_addr   (),
+            .exp_wdata  (),
+            .exp_wstrb  (),
+            .exp_size   (),
+            .exp_ready  (exp_ready),
+            .exp_rdata  (exp_rdata),
+            .exp_error  (exp_error)
+        );
 
     // =========================================================
     // Clock
     // =========================================================
-    initial clk = 1'b0;
-    always #5 clk = ~clk;
+        initial clk = 1'b0;
+        always #5 clk = ~clk;
 
+    
     // =========================================================
-    // IMEM simple
+    // IMEM síncrona real
+    //
+    // Configuración rápida ya validada:
+    //   GNT_DELAY  = 0
+    //   RESP_DELAY = 1
+    //
+    // El modelo y el controlador soportan turnover, permitiendo
+    // un fetch/ciclo después del llenado inicial.
     // =========================================================
-    always_comb begin
-        if (imem_addr[63:10] != 0)
-            imem_rdata = 32'h00000013; // NOP fuera de rango
-        else
-            imem_rdata = imem[imem_addr[9:2]];
-    end
+
+        imem_sync_model #(
+            .MEM_WORDS  (IMEM_WORDS),
+            .GNT_DELAY  (0),
+            .RESP_DELAY (1)
+        ) u_imem (
+            .clk      (clk),
+            .rst      (rst),
+
+            .req_i    (imem_req),
+            .gnt_o    (imem_gnt),
+            .addr_i   (imem_addr),
+
+            .rvalid_o (imem_rvalid),
+            .rdata_o  (imem_rdata)
+        );
 
     // =========================================================
     // DMEM no usada
     // =========================================================
-    assign dmem_rdata = 64'd0;
+        assign dmem_rdata = 64'd0;
 
     // =========================================================
     // Programa de prueba
@@ -114,28 +169,28 @@ module tb_core_jalr_misaligned_trap;
         $dumpvars(0, tb_core_jalr_misaligned_trap);
 
         for (i = 0; i < 256; i = i + 1)
-            imem[i] = 32'h00000013;
+            u_imem.mem[i] = 32'h00000013;
 
         // -------------------------
         // Main
         // -------------------------
-        imem[0] = 32'h10000393; // addi  x7,  x0, 256
-        imem[1] = 32'h30539073; // csrrw x0,  mtvec, x7
-        imem[2] = 32'h06700313; // addi  x6,  x0, 103
-        imem[3] = 32'h00030067; // jalr  x0,  0(x6)
-        imem[4] = 32'h34102573; // csrrs x10, mepc,  x0
-        imem[5] = 32'h00100593; // addi  x11, x0, 1
-        imem[6] = 32'h0000006f; // jal   x0, 0
+        u_imem.mem[0] = 32'h10000393; // addi  x7,  x0, 256
+        u_imem.mem[1] = 32'h30539073; // csrrw x0,  mtvec, x7
+        u_imem.mem[2] = 32'h06700313; // addi  x6,  x0, 103
+        u_imem.mem[3] = 32'h00030067; // jalr  x0,  0(x6)
+        u_imem.mem[4] = 32'h34102573; // csrrs x10, mepc,  x0
+        u_imem.mem[5] = 32'h00100593; // addi  x11, x0, 1
+        u_imem.mem[6] = 32'h0000006f; // jal   x0, 0
 
         // -------------------------
         // Trap handler @ 0x100
         // 0x100 / 4 = 64
         // -------------------------
-        imem[64] = 32'h34202a73; // csrrs x20, mcause, x0
-        imem[65] = 32'h34102af3; // csrrs x21, mepc,   x0
-        imem[66] = 32'h004a8a93; // addi  x21, x21,    4
-        imem[67] = 32'h341a9073; // csrrw x0,  mepc,   x21
-        imem[68] = 32'h30200073; // mret
+        u_imem.mem[64] = 32'h34202a73; // csrrs x20, mcause, x0
+        u_imem.mem[65] = 32'h34102af3; // csrrs x21, mepc,   x0
+        u_imem.mem[66] = 32'h004a8a93; // addi  x21, x21,    4
+        u_imem.mem[67] = 32'h341a9073; // csrrw x0,  mepc,   x21
+        u_imem.mem[68] = 32'h30200073; // mret
 
         rst = 1'b1;
         repeat (5) @(posedge clk);

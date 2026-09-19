@@ -15,9 +15,14 @@ module tb_core_expansion_axi4lite_store_fault;
     localparam logic [63:0] EXPECTED_X12      = 64'h0000_0000_0000_005a;
     localparam logic [63:0] EXPECTED_SENTINEL = 64'h0000_0000_0000_006e;
 
+    localparam int unsigned IMEM_WORDS = 256;
+
     logic clk;
     logic rst;
 
+    logic        imem_req;
+    logic        imem_gnt;
+    logic        imem_rvalid;
     logic [63:0] imem_addr;
     logic [31:0] imem_rdata;
 
@@ -27,6 +32,12 @@ module tb_core_expansion_axi4lite_store_fault;
     logic [63:0] dmem_addr;
     logic [63:0] dmem_wdata;
     logic [1:0]  dmem_size;
+
+    // Handshake de memoria de datos.
+    logic        dmem_req;
+    logic        dmem_gnt;
+    logic        dmem_rvalid;
+    logic        dmem_error;
 
     logic        exp_valid;
     logic        exp_we;
@@ -60,9 +71,8 @@ module tb_core_expansion_axi4lite_store_fault;
     logic [63:0] axi_rdata;
     logic [1:0]  axi_rresp;
     logic        axi_rvalid;
-    logic        axi_rready;
+    logic        axi_rready; 
 
-    logic [31:0] instr_mem [0:255];
     logic [63:0] data_mem  [0:1023];
 
     logic        seen_invalid_axi_store;
@@ -184,6 +194,42 @@ module tb_core_expansion_axi4lite_store_fault;
         end
     endtask
 
+    // =========================================================
+    // Adaptador temporal para los modelos combinacionales
+    // de memoria usados por este testbench.
+    //
+    // El core utiliza el handshake definitivo, mientras este
+    // adaptador proporciona grant inmediato y rvalid +1 ciclo.
+    // =========================================================
+    dmem_legacy_compat u_dmem_legacy_compat (
+        .clk      (clk),
+        .rst      (rst),
+        .req_i    (dmem_req),
+        .gnt_o    (dmem_gnt),
+        .rvalid_o (dmem_rvalid),
+        .error_o  (dmem_error)
+    );
+
+    // =========================================================
+    // IMEM síncrona real
+    // =========================================================
+
+    imem_sync_model #(
+        .MEM_WORDS  (IMEM_WORDS),
+        .GNT_DELAY  (0),
+        .RESP_DELAY (1)
+    ) u_imem (
+        .clk      (clk),
+        .rst      (rst),
+
+        .req_i    (imem_req),
+        .gnt_o    (imem_gnt),
+        .addr_i   (imem_addr),
+
+        .rvalid_o (imem_rvalid),
+        .rdata_o  (imem_rdata)
+    );
+
     core_top #(
         .RESET_PC(64'h0000_0000_0000_0000),
         .TRAP_VECTOR(64'h0000_0000_0000_0100),
@@ -193,9 +239,18 @@ module tb_core_expansion_axi4lite_store_fault;
         .clk(clk),
         .rst(rst),
 
-        .imem_addr(imem_addr),
-        .imem_rdata(imem_rdata),
-        .dmem_rdata(dmem_rdata),
+        .imem_req    (imem_req),
+        .imem_addr   (imem_addr),
+        .imem_gnt    (imem_gnt),
+        .imem_rvalid (imem_rvalid),
+        .imem_rdata  (imem_rdata),
+
+        .dmem_rdata  (dmem_rdata),
+
+        .dmem_req    (dmem_req),
+        .dmem_gnt    (dmem_gnt),
+        .dmem_rvalid (dmem_rvalid),
+        .dmem_error  (dmem_error),
 
         .dmem_we(dmem_we),
         .dmem_wstrb(dmem_wstrb),
@@ -284,13 +339,7 @@ module tb_core_expansion_axi4lite_store_fault;
 
     always #5 clk = ~clk;
 
-    always @(*) begin
-        if (imem_addr[63:10] != 54'd0) begin
-            imem_rdata = 32'h0000_0013;
-        end
-        else begin
-            imem_rdata = instr_mem[imem_addr[9:2]];
-        end
+    always @(*) begin 
 
         if (dmem_addr[63:13] != 51'd0) begin
             dmem_rdata = 64'd0;
@@ -372,8 +421,8 @@ module tb_core_expansion_axi4lite_store_fault;
 
         exp_wait_cycles = 0;
 
-        for (i = 0; i < 256; i = i + 1) begin
-            instr_mem[i] = 32'h0000_0013;
+        for (i = 0; i < IMEM_WORDS; i = i + 1) begin
+            u_imem.mem[i] = 32'h0000_0013;
         end
 
         for (i = 0; i < 1024; i = i + 1) begin
@@ -385,25 +434,25 @@ module tb_core_expansion_axi4lite_store_fault;
         // 0x08: x10 = 0x80000000
         // 0x10: x12 = 0x5a
         // 0x14: sd x12, 0x30(x10) -> RESULT read-only, debe generar store/AMO access fault
-        instr_mem[0] = enc_i(12'h040, 5'd0,  3'b000, 5'd1,  7'b0010011); // addi  x1,  x0, 0x40
-        instr_mem[1] = enc_i(12'h305, 5'd1,  3'b001, 5'd0,  7'b1110011); // csrrw x0,  mtvec, x1
-        instr_mem[2] = enc_i(12'h001, 5'd0,  3'b000, 5'd10, 7'b0010011); // addi  x10, x0, 1
-        instr_mem[3] = enc_i(12'd31,  5'd10, 3'b001, 5'd10, 7'b0010011); // slli  x10, x10, 31
-        instr_mem[4] = enc_i(12'h05a, 5'd0,  3'b000, 5'd12, 7'b0010011); // addi  x12, x0, 0x5a
-        instr_mem[5] = enc_s(12'h030, 5'd12, 5'd10, 3'b011, 7'b0100011); // sd    x12, 0x30(x10)
-        instr_mem[6] = enc_s(12'h208, 5'd12, 5'd0,  3'b011, 7'b0100011); // sd    x12, 0x208(x0)
-        instr_mem[7] = enc_i(12'h06e, 5'd0,  3'b000, 5'd13, 7'b0010011); // addi  x13, x0, 0x6e
-        instr_mem[8] = enc_s(12'h210, 5'd13, 5'd0,  3'b011, 7'b0100011); // sd    x13, 0x210(x0)
-        instr_mem[9] = enc_jal_zero();
+        u_imem.mem[0] = enc_i(12'h040, 5'd0,  3'b000, 5'd1,  7'b0010011); // addi  x1,  x0, 0x40
+        u_imem.mem[1] = enc_i(12'h305, 5'd1,  3'b001, 5'd0,  7'b1110011); // csrrw x0,  mtvec, x1
+        u_imem.mem[2] = enc_i(12'h001, 5'd0,  3'b000, 5'd10, 7'b0010011); // addi  x10, x0, 1
+        u_imem.mem[3] = enc_i(12'd31,  5'd10, 3'b001, 5'd10, 7'b0010011); // slli  x10, x10, 31
+        u_imem.mem[4] = enc_i(12'h05a, 5'd0,  3'b000, 5'd12, 7'b0010011); // addi  x12, x0, 0x5a
+        u_imem.mem[5] = enc_s(12'h030, 5'd12, 5'd10, 3'b011, 7'b0100011); // sd    x12, 0x30(x10)
+        u_imem.mem[6] = enc_s(12'h208, 5'd12, 5'd0,  3'b011, 7'b0100011); // sd    x12, 0x208(x0)
+        u_imem.mem[7] = enc_i(12'h06e, 5'd0,  3'b000, 5'd13, 7'b0010011); // addi  x13, x0, 0x6e
+        u_imem.mem[8] = enc_s(12'h210, 5'd13, 5'd0,  3'b011, 7'b0100011); // sd    x13, 0x210(x0)
+        u_imem.mem[9] = enc_jal_zero();
 
         // Handler en 0x40, índice 16
-        instr_mem[16] = enc_i(12'h342, 5'd0,  3'b010, 5'd20, 7'b1110011); // csrrs x20, mcause, x0
-        instr_mem[17] = enc_i(12'h341, 5'd0,  3'b010, 5'd21, 7'b1110011); // csrrs x21, mepc,   x0
-        instr_mem[18] = enc_s(12'h100, 5'd20, 5'd0,  3'b011, 7'b0100011); // sd    x20, 0x100(x0)
-        instr_mem[19] = enc_s(12'h108, 5'd21, 5'd0,  3'b011, 7'b0100011); // sd    x21, 0x108(x0)
-        instr_mem[20] = enc_i(12'h004, 5'd21, 3'b000, 5'd21, 7'b0010011); // addi  x21, x21, 4
-        instr_mem[21] = enc_i(12'h341, 5'd21, 3'b001, 5'd0,  7'b1110011); // csrrw x0,  mepc, x21
-        instr_mem[22] = 32'h3020_0073;                                    // mret
+        u_imem.mem[16] = enc_i(12'h342, 5'd0,  3'b010, 5'd20, 7'b1110011); // csrrs x20, mcause, x0
+        u_imem.mem[17] = enc_i(12'h341, 5'd0,  3'b010, 5'd21, 7'b1110011); // csrrs x21, mepc,   x0
+        u_imem.mem[18] = enc_s(12'h100, 5'd20, 5'd0,  3'b011, 7'b0100011); // sd    x20, 0x100(x0)
+        u_imem.mem[19] = enc_s(12'h108, 5'd21, 5'd0,  3'b011, 7'b0100011); // sd    x21, 0x108(x0)
+        u_imem.mem[20] = enc_i(12'h004, 5'd21, 3'b000, 5'd21, 7'b0010011); // addi  x21, x21, 4
+        u_imem.mem[21] = enc_i(12'h341, 5'd21, 3'b001, 5'd0,  7'b1110011); // csrrw x0,  mepc, x21
+        u_imem.mem[22] = 32'h3020_0073;                                    // mret
 
         $dumpfile("build/tb_core_expansion_axi4lite_store_fault.vcd");
         $dumpvars(0, tb_core_expansion_axi4lite_store_fault);
