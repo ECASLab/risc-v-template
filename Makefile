@@ -105,7 +105,8 @@ DMEM_SYNC_TESTS := \
 	tb_core_smoke \
 	tb_core_hazards \
 	tb_core_hazard_branch \
-	tb_core_mem_misaligned_trap
+	tb_core_mem_misaligned_trap \
+	tb_core_high_base
 
 # ------------------------------------------------------------
 # Tests que necesitan el modelo IMEM síncrono
@@ -207,6 +208,9 @@ lint_tb_core_csr_ops: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
 
 tb_core_mem_misaligned_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
 lint_tb_core_mem_misaligned_trap: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+
+tb_core_high_base: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
+lint_tb_core_high_base: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
 
 tb_core_smoke: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)
 lint_tb_core_smoke: EXTRA_TB_SRCS += $(IMEM_SYNC_MODEL)

@@ -4,6 +4,13 @@ module dmem_sync_model #(
     // Número de palabras de 64 bits.
     parameter int unsigned MEM_WORDS = 1024,
 
+    // Dirección base visible por el core.
+    //
+    // Se mantiene en cero por defecto para conservar exactamente
+    // el comportamiento de los testbenches existentes.
+    parameter logic [63:0] BASE_ADDR =
+        64'h0000_0000_0000_0000,
+
     // Número de ciclos completos durante los cuales req puede
     // permanecer esperando antes de recibir grant.
     //
@@ -119,18 +126,24 @@ module dmem_sync_model #(
     // Decodificación de dirección
     // =========================================================
 
+        logic [63:0]                  addr_offset;
         logic [63:0]                  word_index_full;
-        logic [MEM_INDEX_W-1:0]      word_index;
+        logic [MEM_INDEX_W-1:0]       word_index;
         logic                         addr_in_range;
         logic                         injected_fault;
         logic                         request_fault;
 
-        assign word_index_full = addr_i >> 3;
+        assign addr_offset =
+            addr_i - BASE_ADDR;
+
+        assign word_index_full =
+            addr_offset >> 3;
 
         assign word_index =
-            addr_i[MEM_INDEX_W + 2 : 3];
+            addr_offset[MEM_INDEX_W + 2 : 3];
 
         assign addr_in_range =
+
             (word_index_full < 64'(MEM_WORDS));
 
         assign injected_fault =
@@ -415,6 +428,13 @@ module dmem_sync_model #(
                 $fatal(
                     1,
                     "dmem_sync_model: MEM_WORDS debe ser mayor que cero"
+                );
+            end
+
+            if (BASE_ADDR[2:0] != 3'b000) begin
+                $fatal(
+                    1,
+                    "dmem_sync_model: BASE_ADDR debe estar alineada a 8 bytes"
                 );
             end
 

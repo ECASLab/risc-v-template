@@ -42,6 +42,13 @@
 module imem_sync_model #(
     parameter int unsigned MEM_WORDS = 1024,
 
+    // Dirección base visible por el core.
+    //
+    // Se mantiene en cero por defecto para conservar exactamente
+    // el comportamiento de los testbenches existentes.
+    parameter logic [63:0] BASE_ADDR =
+        64'h0000_0000_0000_0000,
+
     // ---------------------------------------------------------
     // Número de ciclos completos durante los cuales req puede
     // permanecer esperando antes del grant.
@@ -91,18 +98,24 @@ module imem_sync_model #(
     localparam int unsigned MEM_INDEX_W =
         (MEM_WORDS > 1) ? $clog2(MEM_WORDS) : 1;
 
+    logic [63:0]             addr_offset;
     logic [63:0]             word_index_full;
     logic [MEM_INDEX_W-1:0] word_index;
 
     logic addr_in_range;
     logic addr_aligned;
 
-    assign word_index_full = addr_i >> 2;
+    assign addr_offset =
+        addr_i - BASE_ADDR;
+
+    assign word_index_full =
+        addr_offset >> 2;
 
     assign word_index =
-        addr_i[MEM_INDEX_W + 1 : 2];
+        addr_offset[MEM_INDEX_W + 1 : 2];
 
     assign addr_in_range =
+
         (word_index_full < 64'(MEM_WORDS));
 
     assign addr_aligned =
@@ -435,6 +448,13 @@ module imem_sync_model #(
                 $fatal(
                     1,
                     "imem_sync_model: MEM_WORDS debe ser mayor que cero"
+                );
+            end
+
+            if (BASE_ADDR[1:0] != 2'b00) begin
+                $fatal(
+                    1,
+                    "imem_sync_model: BASE_ADDR debe estar alineada a 4 bytes"
                 );
             end
 
