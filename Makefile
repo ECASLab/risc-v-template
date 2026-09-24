@@ -27,6 +27,10 @@ IVERILOG  ?= iverilog
 VVP       ?= vvp
 VERILATOR ?= verilator
 
+PYTHON        ?= python3
+RISCV_GCC     ?= riscv64-unknown-elf-gcc
+RISCV_OBJCOPY ?= riscv64-unknown-elf-objcopy
+
 # ------------------------------------------------------------
 # Directorios
 # ------------------------------------------------------------
@@ -39,6 +43,25 @@ RTL_DIR   := rtl/core
 EVID_DIR := docs/verification
 LOG_DIR  := $(EVID_DIR)/logs
 DATE_STR ?= $(shell date +%F_%H-%M-%S)
+
+# ------------------------------------------------------------
+# Bare-metal probe
+# ------------------------------------------------------------
+
+BAREMETAL_PROBE_DIR       := sw/baremetal/probe
+BAREMETAL_PROBE_BUILD_DIR := $(BUILD_DIR)/baremetal_probe
+
+BAREMETAL_PROBE_TB        := tb_core_baremetal_probe
+
+BAREMETAL_PROBE_ELF       := $(BAREMETAL_PROBE_BUILD_DIR)/probe.elf
+BAREMETAL_PROBE_BIN       := $(BAREMETAL_PROBE_BUILD_DIR)/probe.bin
+BAREMETAL_PROBE_MAP       := $(BAREMETAL_PROBE_BUILD_DIR)/probe.map
+
+BAREMETAL_PROBE_IMEM_HEX  := $(BAREMETAL_PROBE_BUILD_DIR)/probe_imem.hex
+BAREMETAL_PROBE_DMEM_HEX  := $(BAREMETAL_PROBE_BUILD_DIR)/probe_dmem.hex
+
+BAREMETAL_PROBE_VVP       := $(BAREMETAL_PROBE_BUILD_DIR)/tb_core_baremetal_probe.vvp
+BAREMETAL_PROBE_LOG       := $(BAREMETAL_PROBE_BUILD_DIR)/tb_core_baremetal_probe.log
 
 # ------------------------------------------------------------
 # Flags
@@ -262,8 +285,9 @@ LINT_TESTS := $(addprefix lint_,$(ALL_TESTS))
 # ------------------------------------------------------------
 
 .PHONY: all help \
-	check-tools check-verilator \
-	sim regression regress lint lint-rtl lint-log \
+    check-tools check-verilator check-riscv-tools \
+    sim regression regress lint lint-rtl lint-log \
+    baremetal-probe \
 	run-one list-tests \
 	evidence_dirs regress-log \
 	clean clean-vcd \
@@ -296,6 +320,7 @@ help:
 > @echo "  make run-one TB=tb_core_expansion_mmio"
 > @echo "  make run-one TB=tb_core_expansion_fault_trap"
 > @echo "  make regress-log"
+> @echo "  make baremetal-probe          Compila y ejecuta el probe bare-metal RV64I"
 
 # ------------------------------------------------------------
 # Directorios
@@ -320,6 +345,19 @@ check-tools:
 check-verilator:
 > @command -v $(VERILATOR) >/dev/null 2>&1 || { echo "ERROR: no se encontró $(VERILATOR)"; exit 1; }
 
+check-riscv-tools:
+> @command -v $(RISCV_GCC) >/dev/null 2>&1 || { \
+>     echo "ERROR: no se encontró $(RISCV_GCC)"; \
+>     exit 1; \
+> }
+> @command -v $(RISCV_OBJCOPY) >/dev/null 2>&1 || { \
+>     echo "ERROR: no se encontró $(RISCV_OBJCOPY)"; \
+>     exit 1; \
+> }
+> @command -v $(PYTHON) >/dev/null 2>&1 || { \
+>     echo "ERROR: no se encontró $(PYTHON)"; \
+>     exit 1; \
+> }
 # ------------------------------------------------------------
 # Lista de pruebas
 # ------------------------------------------------------------
@@ -388,6 +426,78 @@ run-one:
 > 	exit 1; \
 > fi
 > @$(MAKE) $(TB)
+
+# ------------------------------------------------------------
+# Bare-metal probe
+#
+# Flujo reproducible:
+#
+#   start.S
+#     -> ELF RV64I
+#     -> binario plano
+#     -> imágenes IMEM/DMEM
+#     -> simulación sobre core_top
+#
+# Este target permanece separado de TESTS/regression porque
+# el TB necesita las imágenes mediante plusargs.
+# ------------------------------------------------------------
+
+baremetal-probe: check-tools check-riscv-tools $(BUILD_DIR)
+> @echo "============================================================"
+> @echo "BARE-METAL PROBE: build + simulation"
+> @echo "============================================================"
+> @mkdir -p $(BAREMETAL_PROBE_BUILD_DIR)
+
+> @$(RISCV_GCC) \
+>     -march=rv64i \
+>     -mabi=lp64 \
+>     -mcmodel=medany \
+>     -mstrict-align \
+>     -nostdlib \
+>     -nostartfiles \
+>     -T $(BAREMETAL_PROBE_DIR)/link.ld \
+>     -Wl,-Map=$(BAREMETAL_PROBE_MAP) \
+>     -o $(BAREMETAL_PROBE_ELF) \
+>     $(BAREMETAL_PROBE_DIR)/start.S
+
+> @$(RISCV_OBJCOPY) \
+>     -O binary \
+>     --gap-fill=0x00 \
+>     $(BAREMETAL_PROBE_ELF) \
+>     $(BAREMETAL_PROBE_BIN)
+
+> @$(PYTHON) tools/bin_to_mem.py \
+>     $(BAREMETAL_PROBE_BIN) \
+>     --imem $(BAREMETAL_PROBE_IMEM_HEX) \
+>     --dmem $(BAREMETAL_PROBE_DMEM_HEX)
+
+> @$(IVERILOG) $(IVERILOG_FLAGS) \
+>     -s $(BAREMETAL_PROBE_TB) \
+>     -o $(BAREMETAL_PROBE_VVP) \
+>     $(RTL_FILES) \
+>     $(IMEM_SYNC_MODEL) \
+>     $(DMEM_SYNC_MODEL) \
+>     $(TB_DIR)/$(BAREMETAL_PROBE_TB).sv
+
+> @set -o pipefail; \
+> $(VVP) $(BAREMETAL_PROBE_VVP) \
+>     +IMEM_HEX=$(abspath $(BAREMETAL_PROBE_IMEM_HEX)) \
+>     +DMEM_HEX=$(abspath $(BAREMETAL_PROBE_DMEM_HEX)) \
+>     | tee $(BAREMETAL_PROBE_LOG); \
+> sim_status=$${PIPESTATUS[0]}; \
+> if [ $$sim_status -ne 0 ]; then \
+>     echo "[FAIL] baremetal-probe -- vvp retornó error"; \
+>     exit $$sim_status; \
+> fi; \
+> if grep -Eq "(^|[[:space:]])FAIL:|(^|[[:space:]])ERROR:" \
+>     $(BAREMETAL_PROBE_LOG); then \
+>     echo "[FAIL] baremetal-probe -- el log contiene FAIL o ERROR"; \
+>     exit 1; \
+> fi
+
+> @echo "============================================================"
+> @echo "PASS: bare-metal probe completado"
+> @echo "============================================================"
 
 # ------------------------------------------------------------
 # Lint con Verilator
