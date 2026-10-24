@@ -1,0 +1,9 @@
+TFG — B.9.3.9b
+Auditoría estática del contrato UDB, Sail y RTL.
+
+1. Extraer: tar -xzf ~/Descargas/B9_3_9b_auditoria_fuentes.tar.gz -C ~/TFG_tools
+2. Ejecutar: bash ~/TFG_tools/B9_3_9b_auditoria_fuentes/ejecutar_B9_3_9b.sh
+3. Compartir: ~/TFG_tools/B9_3_9b_resultados.tar.gz
+
+No edita fuentes, YAML ni RTL. Conserva copias para evaluación técnica.
+Importante: las advertencias identifican hipótesis pendientes, no fallos nuevos de simulación.

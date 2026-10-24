@@ -1,0 +1,9 @@
+caso,resultado,exit_simulador,razon
+valido_base,PASS,0,lectura_valida
+valido_ultima,PASS,0,lectura_valida
+invalido_fin,PASS,1,fatal_esperado_modelo
+invalido_inferior,PASS,1,fatal_esperado_modelo
+invalido_mas_2p32,PASS,1,fatal_esperado_modelo
+invalido_mas_2p55,PASS,1,fatal_esperado_modelo
+invalido_mas_2p56,PASS,1,fatal_esperado_modelo
+invalido_desalineada,PASS,1,fatal_esperado_modelo

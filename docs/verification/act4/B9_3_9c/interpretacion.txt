@@ -1,0 +1,2 @@
+
+ADVERTENCIA: Ambas validaciones solo prueban aceptacion de configuracion, no ancho PA del RTL.

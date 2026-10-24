@@ -1,0 +1,3 @@
+caso,resultado,exit_simulador,operaciones_mmio,observacion
+con_fence,PASS,0,3,orden_observable_y_esperas
+sin_fence,PASS,0,3,orden_observable_y_esperas

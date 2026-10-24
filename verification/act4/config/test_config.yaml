@@ -1,0 +1,10 @@
+# TFG: ACT4 con LLVM/Clang 22, sin modificar test_config.yaml original.
+name: tfg-rv64i-clang22
+compiler_exe: /usr/bin/clang-22
+objdump_exe: /usr/bin/llvm-objdump-22
+ref_model_exe: /home/saul/TFG_tools/sail-riscv-0.16/bin/sail_riscv_sim
+udb_config: tfg-rv64i.yaml
+linker_script: link.ld
+dut_include_dir: .
+harts: 1
+include_priv_tests: false

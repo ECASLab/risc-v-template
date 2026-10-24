@@ -1,0 +1,48 @@
+{
+  "core_git_head": "cf78be1cc7206879744f7587ab9806a508113b24",
+  "sha256": {
+    "core_top": "cdc92a0bcd5841a14a0e63fb4a5a9eca140c395b1dd853359663277671d491f7",
+    "imem_model": "9d4a22ab33992d93abce7727cd6ced2ef9914f20404eac807cc40ca5ef818446",
+    "dmem_model": "5e2f7f52c3c4776cb381aa4fd846948fbb1f88f9f24b9250499d6dc775c11a33",
+    "sail": "c2000c9c85ffde07517fb581e5af520d8709886ea942e15583c30d6a803772ea",
+    "udb": "056eecbfcd0973cede1464c4e8c19c89e8bfba3627e6decaa07f67d70461a6c1"
+  },
+  "sail_regions": [
+    {
+      "type": "IOMemory",
+      "base": "0x0000000002000000",
+      "end_exclusive": "0x000000000200c000",
+      "size_bytes": 49152
+    },
+    {
+      "type": "IOMemory",
+      "base": "0x000000000c000000",
+      "end_exclusive": "0x000000000c001000",
+      "size_bytes": 4096
+    },
+    {
+      "type": "IOMemory",
+      "base": "0x0000000010000000",
+      "end_exclusive": "0x0000000010001000",
+      "size_bytes": 4096
+    },
+    {
+      "type": "MainMemory",
+      "base": "0x0000000080000000",
+      "end_exclusive": "0x0000000080100000",
+      "size_bytes": 1048576
+    }
+  ],
+  "max_region_end_exclusive": "0x80100000",
+  "all_configured_regions_below_4GiB": true,
+  "core_imem_addr_bits": 64,
+  "core_dmem_addr_bits": 64,
+  "core_imem_error_input_present": false,
+  "imem_out_of_range_handling": "$fatal en modelo de simulacion: no hay respuesta de fault a core",
+  "dmem_out_of_range_handling": "modelo retorna error_o; core tiene dmem_error y traps de acceso de datos",
+  "mmio_expansion_decode": "mascara y comparacion de 64 bits",
+  "baseline_udb_phys_addr_width": 56,
+  "baseline_sail_physaddr_bits": 32,
+  "candidate_32_56": "ambas aceptadas, pero no prueban implementacion de ancho PA",
+  "interpretation": "No hay prueba de que exista un limite PA global en 32 bits. Se observa mapa por debajo de 4GiB y comparaciones a 64 bits. Falta politica de arquitectura/plataforma para fetch fuera de rango."
+}

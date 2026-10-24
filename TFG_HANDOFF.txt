@@ -1,0 +1,234 @@
+TFG - CONTEXTO TECNICO Y PUNTO DE REANUDACION
+================================================
+Fecha de refinamiento: 2026-10-23 19:07 -0600
+Proyecto: Desarrollo y verificacion de un nucleo RISC-V RV64I con interfaz de expansion para aceleradores en FPGA.
+Repositorio principal: /run/media/saul/Data/Documentos/Linux/TFG_downloads/riscv-core-project/risc-v-template
+Rama: main
+Commit base RTL: cf78be1cc7206879744f7587ab9806a508113b24
+Commit ACT4 observado: d6094ad3ede5268b454197e7bb8eb1cbcbe140d0
+
+AUTORIDAD Y TRAZABILIDAD
+-------------------------
+- Alcance academico: Anteproyecto___Saul_Ramirez-Actualizado.pdf.
+- Evolucion temporal: Actualizaciones del TFG.pdf.
+- El repositorio Git versionado es fuente de verdad para RTL, TB y software.
+- Este handoff resume: no duplica archivos fuente ni reemplaza pruebas.
+- Cada archivo ACT4 importado tiene su origen y SHA-256 en verification/act4/ORIGEN_FUENTES.csv.
+- Copias originales permanecen en ~/TFG_tools y en respaldos externos.
+
+ESTADO FUNCIONAL ACREDITADO HISTORICAMENTE
+------------------------------------------
+- Nucleo RV64I pipeline de cinco etapas, in-order y single-issue.
+- IMEM y DMEM externas sincronas con fases req/gnt/rvalid; como maximo una operacion pendiente por interfaz.
+- Hazard load-use, forwarding, redirects, CSR/traps M-mode minimo y MMIO de expansion.
+- AXI4-Lite como adaptador opcional sobre interfaz de expansion; no es protocolo nativo del nucleo.
+- Programa bare-metal de prueba con LD/SD y flujo ELF a imagenes de memoria.
+- Auditoria ACT4 RV64I: 51 pruebas distintas, 51 PASS, 0 FAIL; no certificacion exhaustiva.
+- Regresion local historica: 35 PASS; prueba FENCE/MMIO dirigida: dos escenarios PASS.
+- Estas cifras provienen de reportes historicos, NO de una nueva ejecucion tras reorganizar.
+
+CONFIGURACION DE DIRECCIONES
+----------------------------
+- Mapa utilizado en los programas de alta base: RAM_BASE=0x80000000, RAM=1 MiB, RESET_PC=0x80000000.
+- TRAP_VECTOR de la plataforma de prueba=0x80000100; region MMIO=0x10000000, 4 KiB.
+- ATENCION: los parametros POR DEFECTO de rtl/core/core_top.sv pueden diferir.
+- Los overrides del testbench/sistema prevalecen: no interpretar defaults como el mapa de las pruebas ACT4.
+- Mantener separados sw/baremetal/probe/link.ld y verification/act4/config/link.ld.
+
+CONFIGURACION Y LIMITACIONES ABIERTAS
+-------------------------------------
+- ACT4 de la revision documentada, con UDB y Sail propios; Sm provisional y pruebas privilegiadas ACT4 desactivadas.
+- Conciliar PHYS_ADDR_WIDTH UDB (56) y Sail (32), PMA_GRANULARITY, declaraciones Zicsr y CSR/traps.
+- El modelo IMEM rechaza solicitudes invalidas mediante $fatal: NO demuestra trap arquitectural instruction access fault.
+- El alcance verificado de FENCE/MMIO es el orden serializado observado, no todos los modelos de memoria.
+- Pendiente: demostrar acelerador con un programa bare-metal completo, top FPGA, memoria sintetizable, XDC, timing, bitstream.
+- Vivado no estaba disponible en PATH del diagnostico; no equivale a desinstalado.
+
+COMANDOS DE VERIFICACION DEL REPOSITORIO
+---------------------------------------
+cd /run/media/saul/Data/Documentos/Linux/TFG_downloads/riscv-core-project/risc-v-template
+make regression
+make lint
+make baremetal-probe
+git status --short
+NOTA: los runners historicos ACT4 aun pueden referir rutas absolutas en ~/TFG_tools; antes de ejecutarlos, auditarlas.
+
+FUENTES Y EVIDENCIAS CLAVE (SHA-256)
+----------------------------------
+rtl/core/core_top.sv | cdc92a0bcd5841a14a0e63fb4a5a9eca140c395b1dd853359663277671d491f7
+rtl/core/csr_file.sv | c26a5497051412a7d1a1ab2fbf7efbbe74a627a805acaa391f912092f9e04a8c
+rtl/core/decoder.sv | c7a43aa86b9b69ed0d334fb0b225b68d7541f03bc121ef3f9b2a455e8290353f
+verification/act4/config/link.ld | a58267ba92174cbdc5f5bcbe836d10c99971ce26b894a5d9e5d8f5b76d851a0b
+verification/act4/config/test_config.yaml | b857bedc54e7a3421d83ffdc789bcaf709a54c70c76b3222c85300b9ee4ddac3
+verification/act4/config/tfg-rv64i.yaml | 056eecbfcd0973cede1464c4e8c19c89e8bfba3627e6decaa07f67d70461a6c1
+verification/act4/config/sail.json | c2000c9c85ffde07517fb581e5af520d8709886ea942e15583c30d6a803772ea
+verification/act4/config/rvmodel_macros.h | 6e73211b03cd663eb7e511928eba8a5427971cc2e106fc0034e683085e3098fa
+verification/act4/runner_b9_3_8k/tb_core_act4_generic.sv | 768175ebb68c3e202dd67fb0b1a21ec021e8f733335647044cc649804887c350
+docs/verification/act4/cierre_51/resultados_51_ACT4.csv | d3c7cb12651d38e27b899330fb6c55fede374ac6c271c20132e592830fe08e9b
+Manifiesto de origen: verification/act4/ORIGEN_FUENTES.csv (62 registros)
+
+INVENTARIO VERSIONADO POR DIRECTORIO
+-----------------------------------
+[RTL del núcleo] (18 archivos)
+  rtl/core/alu.sv
+  rtl/core/axi4lite_expansion_demo_periph.sv
+  rtl/core/branch_unit.sv
+  rtl/core/core_top.sv
+  rtl/core/csr_file.sv
+  rtl/core/decoder.sv
+  rtl/core/dmem_handshake_ctrl.sv
+  rtl/core/dmem_legacy_compat.sv
+  rtl/core/ex_mem_reg.sv
+  rtl/core/exp_axi4lite_master_bridge.sv
+  rtl/core/expansion_demo_periph.sv
+  rtl/core/hazard_unit.sv
+  rtl/core/id_ex_reg.sv
+  rtl/core/if_id_reg.sv
+  rtl/core/imem_handshake_ctrl.sv
+  rtl/core/imm_gen.sv
+  rtl/core/mem_wb_reg.sv
+  rtl/core/regfile.sv
+
+[Memorias y testbenches] (56 archivos)
+  tb/cocotb/tests/ORexample/Makefile
+  tb/cocotb/tests/ORexample/or_gate.v
+  tb/cocotb/tests/ORexample/or_gate_test.py
+  tb/cocotb/tests/adder_example/Makefile
+  tb/cocotb/tests/adder_example/adder.v
+  tb/cocotb/tests/adder_example/test_adder.py
+  tb/models/dmem_sync_model.sv
+  tb/models/imem_sync_model.sv
+  tb/tb_sv/core_hazard_branch.f
+  tb/tb_sv/core_hazards.f
+  tb/tb_sv/core_illegal_trap.f
+  tb/tb_sv/core_jalr_misaligned_trap.f
+  tb/tb_sv/core_jump.f
+  tb/tb_sv/core_mem_sizes.f
+  tb/tb_sv/core_smoke.f
+  tb/tb_sv/core_system_trap.f
+  tb/tb_sv/tb_alu_w.out
+  tb/tb_sv/tb_alu_w.sv
+  tb/tb_sv/tb_axi4lite_expansion_demo_periph.sv
+  tb/tb_sv/tb_core_baremetal_probe.sv
+  tb/tb_sv/tb_core_branch_misaligned_trap.sv
+  tb/tb_sv/tb_core_csr_ops.sv
+  tb/tb_sv/tb_core_directed.sv
+  tb/tb_sv/tb_core_dmem_sync.sv
+  tb/tb_sv/tb_core_dmem_sync_fault.sv
+  tb/tb_sv/tb_core_dmem_sync_subword.sv
+  tb/tb_sv/tb_core_ebreak_trap.sv
+  tb/tb_sv/tb_core_expansion_axi4lite_load_fault.sv
+  tb/tb_sv/tb_core_expansion_axi4lite_store_fault.sv
+  tb/tb_sv/tb_core_expansion_axi4lite_wait.sv
+  tb/tb_sv/tb_core_expansion_fault_trap.sv
+  tb/tb_sv/tb_core_expansion_mmio.sv
+  tb/tb_sv/tb_core_expansion_priv_wait.sv
+  tb/tb_sv/tb_core_expansion_store_fault_trap.sv
+  tb/tb_sv/tb_core_hazard_branch.sv
+  tb/tb_sv/tb_core_hazards.sv
+  tb/tb_sv/tb_core_high_base.sv
+  tb/tb_sv/tb_core_illegal_trap.sv
+  tb/tb_sv/tb_core_imem_sync.sv
+  tb/tb_sv/tb_core_jal_misaligned_trap.sv
+  tb/tb_sv/tb_core_jalr_misaligned_trap.sv
+  tb/tb_sv/tb_core_jump.sv
+  tb/tb_sv/tb_core_mem_misaligned_trap.sv
+  tb/tb_sv/tb_core_mem_sizes.sv
+  tb/tb_sv/tb_core_mtval.sv
+  tb/tb_sv/tb_core_smoke.sv
+  tb/tb_sv/tb_core_system_trap.sv
+  tb/tb_sv/tb_decoder_w.out
+  tb/tb_sv/tb_decoder_w.sv
+  tb/tb_sv/tb_dmem_handshake_ctrl.sv
+  tb/tb_sv/tb_dmem_legacy_compat.sv
+  tb/tb_sv/tb_dmem_sync_model.sv
+  tb/tb_sv/tb_exp_axi4lite_master_bridge.sv
+  tb/tb_sv/tb_expansion_demo_periph.sv
+  tb/tb_sv/tb_imem_handshake_ctrl.sv
+  tb/tb_sv/tb_imem_sync_model.sv
+
+[Software bare-metal] (2 archivos)
+  sw/baremetal/probe/link.ld
+  sw/baremetal/probe/start.S
+
+[Config ACT4] (7 archivos)
+  verification/act4/config/link.ld
+  verification/act4/config/rvmodel_macros.h
+  verification/act4/config/rvtest_config.h
+  verification/act4/config/rvtest_config.svh
+  verification/act4/config/sail.json
+  verification/act4/config/test_config.yaml
+  verification/act4/config/tfg-rv64i.yaml
+
+[Runner ACT4 histórico] (8 archivos)
+  verification/act4/runner_b9_3_8k/LEEME.txt
+  verification/act4/runner_b9_3_8k/act4_runner.mk
+  verification/act4/runner_b9_3_8k/auditar_pendientes.py
+  verification/act4/runner_b9_3_8k/convertir_elf_act4_generico.py
+  verification/act4/runner_b9_3_8k/ejecutar_B9_3_8k.sh
+  verification/act4/runner_b9_3_8k/ejecutar_caso.sh
+  verification/act4/runner_b9_3_8k/tb_core_act4_generic.sv
+  verification/act4/runner_b9_3_8k/verificar_imagenes_generico.py
+
+[Auditorías dirigidas] (28 archivos)
+  verification/act4/auditorias_historicas/B9_3_9a_cierre/LEEME.txt
+  verification/act4/auditorias_historicas/B9_3_9a_cierre/auditar_51_ACT4.py
+  verification/act4/auditorias_historicas/B9_3_9a_cierre/ejecutar_B9_3_9a_cierre.sh
+  verification/act4/auditorias_historicas/B9_3_9b_auditoria_fuentes/LEEME.txt
+  verification/act4/auditorias_historicas/B9_3_9b_auditoria_fuentes/auditar_config.py
+  verification/act4/auditorias_historicas/B9_3_9b_auditoria_fuentes/ejecutar_B9_3_9b.sh
+  verification/act4/auditorias_historicas/B9_3_9c_anchos/LEEME.txt
+  verification/act4/auditorias_historicas/B9_3_9c_anchos/ejecutar_B9_3_9c.sh
+  verification/act4/auditorias_historicas/B9_3_9c_anchos/preparar_candidatas.py
+  verification/act4/auditorias_historicas/B9_3_9d_mapa_y_alias_pa/LEEME.txt
+  verification/act4/auditorias_historicas/B9_3_9d_mapa_y_alias_pa/auditar_mapa_pa.py
+  verification/act4/auditorias_historicas/B9_3_9d_mapa_y_alias_pa/ejecutar_B9_3_9d.sh
+  verification/act4/auditorias_historicas/B9_3_9d_mapa_y_alias_pa/tb_pa_dmem.sv
+  verification/act4/auditorias_historicas/B9_3_9e_v3_sin_strings/LEEME.txt
+  verification/act4/auditorias_historicas/B9_3_9e_v3_sin_strings/auditar_B9_3_9e_v2.py
+  verification/act4/auditorias_historicas/B9_3_9e_v3_sin_strings/ejecutar_B9_3_9e_v3.sh
+  verification/act4/auditorias_historicas/B9_3_9e_v3_sin_strings/tb_imem_limites.sv
+  verification/act4/auditorias_historicas/B9_3_9f_v3_vars_corregidas/LEEME.txt
+  verification/act4/auditorias_historicas/B9_3_9f_v3_vars_corregidas/ejecutar_B9_3_9f_v3.sh
+  verification/act4/auditorias_historicas/B9_3_9f_v3_vars_corregidas/runner.mk
+  verification/act4/auditorias_historicas/B9_3_9f_v3_vars_corregidas/tb_core_imem_integracion.sv
+  verification/act4/auditorias_historicas/B9_3_9g_matriz_csr_traps/LEEME.md
+  verification/act4/auditorias_historicas/B9_3_9g_matriz_csr_traps/auditar_B9_3_9g.py
+  verification/act4/auditorias_historicas/B9_3_9g_matriz_csr_traps/ejecutar_B9_3_9g.sh
+  verification/act4/auditorias_historicas/B9_3_9h_fence_mmio_serial/LEEME.md
+  verification/act4/auditorias_historicas/B9_3_9h_fence_mmio_serial/ejecutar_B9_3_9h.sh
+  verification/act4/auditorias_historicas/B9_3_9h_fence_mmio_serial/runner.mk
+  verification/act4/auditorias_historicas/B9_3_9h_fence_mmio_serial/tb_b9h_fence_mmio.sv
+
+[Evidencias seleccionadas] (19 archivos)
+  docs/verification/act4/B9_3_9b/informe.md
+  docs/verification/act4/B9_3_9b/resultado.json
+  docs/verification/act4/B9_3_9c/interpretacion.txt
+  docs/verification/act4/B9_3_9c/manifiesto.json
+  docs/verification/act4/B9_3_9d/auditoria_pa.json
+  docs/verification/act4/B9_3_9d/informe.md
+  docs/verification/act4/B9_3_9e_v3/conclusion.md
+  docs/verification/act4/B9_3_9e_v3/resumen.csv
+  docs/verification/act4/B9_3_9f_v3/conclusion.md
+  docs/verification/act4/B9_3_9f_v3/resumen.csv
+  docs/verification/act4/B9_3_9g/informe.md
+  docs/verification/act4/B9_3_9g/matriz_trazabilidad.csv
+  docs/verification/act4/B9_3_9h/conclusion.md
+  docs/verification/act4/B9_3_9h/resumen.csv
+  docs/verification/act4/cierre_51/entorno_git.txt
+  docs/verification/act4/cierre_51/informe_cierre_ACT4_RV64I.md
+  docs/verification/act4/cierre_51/resultados_51_ACT4.csv
+  docs/verification/act4/cierre_51/resultados_regresion.csv
+  docs/verification/act4/cierre_51/sha256_archivos_historicos.txt
+
+PROXIMAS ACTIVIDADES
+--------------------
+1. Cerrar revision Git y los artefactos sueltos sin borrar evidencias.
+2. Verificar make regression, make lint y make baremetal-probe en el mismo commit.
+3. Comprobar reproducibilidad ACT4 en el repositorio reorganizado (sin inventar pass).
+4. Seleccionar FPGA e integrar un programa que controle y lea el acelerador.
+5. Completar documentacion, temporizacion, utilizacion y demostracion FPGA.
+
+ESTADO DEL COMMIT
+-----------------
+Este handoff se genero ANTES del commit de organizacion; no implica que se haya confirmado nada.

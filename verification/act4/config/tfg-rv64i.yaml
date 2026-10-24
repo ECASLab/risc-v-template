@@ -1,0 +1,55 @@
+# ACT4/UDB: borrador MINIMO para RV64I del TFG, no validado aun por la gema UDB.
+# Evitar declarar extensiones que no se hayan comprobado sobre el RTL.
+# I 2.1 coincide con la version de ISA utilizada por el ELF bare-metal.
+---
+$schema: config_schema.json#
+kind: architecture configuration
+type: fully configured
+name: tfg-rv64i-sm-candidato-v2
+description: Nucleo educativo RV64I in-order de cinco etapas, M-mode minimo
+implemented_extensions:
+  - { name: I, version: "= 2.1" }
+  # Sm SOLO para permitir MXLEN en la fase de tests I; no acredita M-mode completo.
+  - { name: Sm, version: "= 1.11.0" }
+params:
+  # Parametros requeridos al declarar Sm. Verificar ante cualquier prueba privilegiada.
+  # HIPOTESIS de plataforma: PHYS_ADDR_WIDTH=56 (consistente con Sail 0.16)
+  # y PMA_GRANULARITY=3 (granularidad propuesta de 8 bytes).
+  HPM_COUNTER_EN: [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+  MARCHID_IMPLEMENTED: false
+  MCOUNTENABLE_EN: [false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false, false]
+  MCOUNTINHIBIT_IMPLEMENTED: false
+  MIMPID_IMPLEMENTED: false
+  MISALIGNED_LDST_EXCEPTION_PRIORITY: high
+  MTVEC_ILLEGAL_WRITE_BEHAVIOR: custom
+  M_MODE_ENDIANNESS: little
+  PHYS_ADDR_WIDTH: 56
+  PMA_GRANULARITY: 3
+  REPORT_VA_IN_MTVAL_ON_INSTRUCTION_ACCESS_FAULT: false
+  TRAP_ON_ILLEGAL_WLRL: false
+  VENDOR_ID_BANK: 0
+  VENDOR_ID_OFFSET: 0
+  WFI_FINITE: false
+  WFI_U_MODE: false
+  MXLEN: 64
+  NON_STANDARD_EXTENSION_IMPLEMENTED: false
+  MISALIGNED_LDST: false
+  PRECISE_SYNCHRONOUS_EXCEPTIONS: true
+  TRAP_ON_ECALL_FROM_M: true
+  TRAP_ON_EBREAK: true
+  TRAP_ON_UNIMPLEMENTED_INSTRUCTION: true
+  TRAP_ON_RESERVED_INSTRUCTION: true
+  TRAP_ON_UNIMPLEMENTED_CSR: true
+  MISA_CSR_IMPLEMENTED: true
+  MTVEC_ACCESS: rw
+  MTVEC_MODES: [0]
+  MTVEC_BASE_ALIGNMENT_DIRECT: 4
+  NUM_PMP_ENTRIES: 0
+  REPORT_VA_IN_MTVAL_ON_BREAKPOINT: false
+  REPORT_VA_IN_MTVAL_ON_LOAD_MISALIGNED: true
+  REPORT_VA_IN_MTVAL_ON_STORE_AMO_MISALIGNED: true
+  REPORT_VA_IN_MTVAL_ON_INSTRUCTION_MISALIGNED: true
+  REPORT_VA_IN_MTVAL_ON_LOAD_ACCESS_FAULT: true
+  REPORT_VA_IN_MTVAL_ON_STORE_AMO_ACCESS_FAULT: true
+  REPORT_ENCODING_IN_MTVAL_ON_ILLEGAL_INSTRUCTION: true
+  MTVAL_WIDTH: 64

@@ -1,0 +1,30 @@
+B.9.3.9d — Verificación sin cambios del mapa de memoria y alias en DMEM
+
+Objetivo: Conservar evidencia que delimite lo que SÍ está verificado sobre
+los bits físicos de dirección. La aceptación de configuraciones 32/32 y 56/56
+por UDB y Sail NO define el ancho físico efectivo del procesador o de FPGA.
+
+Comandos (Ubuntu):
+  tar -xzf "$HOME/Descargas/B9_3_9d_mapa_y_alias_pa.tar.gz" -C "$HOME/TFG_tools"
+  bash -n "$HOME/TFG_tools/B9_3_9d_mapa_y_alias_pa/ejecutar_B9_3_9d.sh"
+  bash "$HOME/TFG_tools/B9_3_9d_mapa_y_alias_pa/ejecutar_B9_3_9d.sh"
+
+Requisitos: iverilog, vvp, python3 y archivos originales del TFG en sus rutas.
+Es posible definir TFG_CORE y TFG_CONFIG mediante variables de entorno.
+
+Ejecuta auditoría SHA contra B.9.3.9b/c, valida que las regiones Sail caben en
+32 bits, verifica propiedades de interfaces y tratamiento de errores, y simula
+9 transacciones contra dmem_sync_model (solo modelo DMEM): 3 válidas,
+5 cargas fuera del rango y un store fuera del rango. Comprueba que no existe
+alias por bits superiores y que el store rechazado no corrompe RAM.
+
+Aclaración: esta prueba NO estimula core_top, NO simula FPGA y NO acredita un
+PHYS_ADDR_WIDTH de 32 o 56 bits para el DUT. Identifica límites conocidos del
+modelo y permite decidir qué garantías faltan antes de declarar PA definitivo.
+Una limitación importante es que el modelo IMEM genera $fatal si la dirección
+está fuera de rango, y core_top no recibe un error de acceso IMEM.
+
+Archivo para compartir:
+  ~/TFG_tools/B9_3_9d_resultados.tar.gz
+
+No sobrescribe resultados anteriores. En fallos intenta conservar diagnósticos.

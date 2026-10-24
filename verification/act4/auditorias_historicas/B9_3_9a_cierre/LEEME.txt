@@ -1,0 +1,22 @@
+TFG — B.9.3.9a: auditoria de cierre ACT4 RV64I y no regresion
+
+1) Extraiga B9_3_9a_cierre.tar.gz en ~/TFG_tools:
+   tar -xzf "$HOME/Descargas/B9_3_9a_cierre.tar.gz" -C "$HOME/TFG_tools"
+2) Ejecute:
+   bash "$HOME/TFG_tools/B9_3_9a_cierre/ejecutar_B9_3_9a_cierre.sh"
+
+Requiere los 9 archivos historicos de resultados en ~/TFG_tools:
+- B9_3_8c_resultados.tar.gz, B9_3_8d_resultados.tar.gz
+- B9_3_8e_resultados.tar.gz ... B9_3_8k_resultados.tar.gz
+
+El script verifica los 51 resultados archivados y vuelve a correr:
+  make baremetal-probe, make regression, make lint
+
+No altera los archivos SystemVerilog ni el repositorio ACT4.
+Los objetivos make pueden generar archivos de compilacion y logs normales dentro del repositorio.
+No sobrescribe un paquete de resultados preexistente.
+
+Salida: ~/TFG_tools/B9_3_9a_resultados.tar.gz
+Compartalo incluso si alguna comprobacion falla.
+
+Si el repositorio no esta en su ruta historica, ejecute con CORE_ROOT=/ruta/al/repo

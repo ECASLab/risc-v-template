@@ -1,0 +1,31 @@
+TFG — B.9.3.9e-v3. Corrección de incompatibilidad con Icarus Verilog 12.0.
+
+EVIDENCIA DEL FALLO ANTERIOR:
+B.9.3.9e-v2 compiló correctamente; vvp abortó antes de comenzar cualquier prueba:
+  %load/v error: Net arg not a signal? 24vvp_fun_signal_string_sa
+  Assertion `sig' failed.
+El bytecode VVP de v2 contiene "%load/vec4" de la variable .var/str "caso" al evaluar case(caso).
+Esto identifica un error de interacción SystemVerilog string / Icarus, no un fallo del núcleo.
+Caso análogo de error VVP con strings: https://github.com/steveicarus/iverilog/issues/1298
+
+CAMBIO V3:
+- Sustituye string caso por integer caso_id; +ID=<entero> en vez de +CASO=<nombre>.
+- Elimina case(string) y comparaciones de cadenas.
+- Los ocho casos y direcciones esperadas son idénticos a v2.
+- Los casos negativos se aprueban solo con codigo no cero, mensaje FATAL, texto de error
+  y direccion correcta. No acepta aserciones internas de vvp.
+- Deshabilita la generación de nuevos volcados core del shell ejecutor.
+- Preserva B9_3_9e_resultados.tar.gz y B9_3_9e_v2_resultados.tar.gz anteriores.
+- SIN cambios RTL, UDB, Sail ni historial Git.
+
+EJECUTAR (descargado en ~/Descargas):
+  tar -xzf "$HOME/Descargas/B9_3_9e_v3_sin_strings.tar.gz" -C "$HOME/TFG_tools"
+  bash -n "$HOME/TFG_tools/B9_3_9e_v3_sin_strings/ejecutar_B9_3_9e_v3.sh"
+  bash "$HOME/TFG_tools/B9_3_9e_v3_sin_strings/ejecutar_B9_3_9e_v3.sh"
+
+RESULTADOS PARA COMPARTIR:
+  ~/TFG_tools/B9_3_9e_v3_resultados.tar.gz
+
+NOTA DE INTERPRETACIÓN:
+Las pruebas usan el modelo IMEM REAL del repo, pero aisladamente, con 16 bytes de memoria.
+El PASS de un caso negativo NO significa que core_top genere mcause=1; es un $fatal del modelo.

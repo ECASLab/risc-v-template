@@ -1,0 +1,20 @@
+aspecto,prueba,evidencia,tipo
+CSR: operaciones y acceso,tb_core_csr_ops,PASS historico en B.9.3.9a,RTL dirigido
+CSR: valor mtval,tb_core_mtval,PASS historico en B.9.3.9a,RTL dirigido
+Sistema: ECALL y MRET,tb_core_system_trap,PASS historico en B.9.3.9a,RTL dirigido
+Sistema: EBREAK,tb_core_ebreak_trap,PASS historico en B.9.3.9a,RTL dirigido
+Excepción: instrucción ilegal,tb_core_illegal_trap,PASS historico en B.9.3.9a,RTL dirigido
+Excepción: salto condicional desalineado,tb_core_branch_misaligned_trap,PASS historico en B.9.3.9a,RTL dirigido
+Excepción: JAL desalineado,tb_core_jal_misaligned_trap,PASS historico en B.9.3.9a,RTL dirigido
+Excepción: JALR desalineado,tb_core_jalr_misaligned_trap,PASS historico en B.9.3.9a,RTL dirigido
+Excepción: load/store desalineado,tb_core_mem_misaligned_trap,PASS historico en B.9.3.9a,RTL dirigido
+Excepción: acceso de datos al modelo,tb_core_dmem_sync_fault,PASS historico en B.9.3.9a,RTL dirigido
+Excepción: MMIO carga no válida,tb_core_expansion_fault_trap,PASS historico en B.9.3.9a,RTL dirigido
+Excepción: MMIO escritura no válida,tb_core_expansion_store_fault_trap,PASS historico en B.9.3.9a,RTL dirigido
+Precisión: CSR/trap durante waits,tb_core_expansion_priv_wait,PASS historico en B.9.3.9a,RTL dirigido
+Precisión: AXI lectura con fallo,tb_core_expansion_axi4lite_load_fault,PASS historico en B.9.3.9a,RTL dirigido
+Precisión: AXI escritura con fallo,tb_core_expansion_axi4lite_store_fault,PASS historico en B.9.3.9a,RTL dirigido
+Acceso inválido de instrucción,B.9.3.9f-v3,Modelo IMEM emite $fatal; no trap de core_top,LIMITACION
+Privilegio completo Sm,ACT4 include_priv_tests=false,No acreditado por ACT4,FUERA DE ALCANCE ACREDITADO
+Extensión completa Zicsr,ACT4 Zicsr no declarado,6 formatos en decoder; conformidad total no acreditada,PENDIENTE DE ALCANCE
+Ordenamiento FENCE-MMIO,ACT4 I-fence-00,"PASS ISA de FENCE, no cubre todo ordenamiento MMIO",PENDIENTE DIRIGIDO

@@ -1,0 +1,27 @@
+TFG — B.9.3.8k: cierre de la suite RV64I de 51 fuentes (FENCE y NOP)
+
+Objetivo: ejecutar sin repetir las pruebas anteriores:
+  I-fence-00
+  I-nop-00
+
+Antes de correr verifica ACT4 HEAD, inventario de 51, archivo B.9.3.8j
+resumen.csv con sus ocho PASS, y las configuraciones inmutables fijadas.
+Usa Clang 22, Sail 0.16, Icarus, conversor y testbench del proyecto.
+No modifica RTL, Makefile ni el repositorio de ACT4.
+Los errores generan diagnósticos individuales; se conserva el resultado.
+
+Comandos (Ubuntu):
+  tar -xzf "$HOME/Descargas/B9_3_8k_lote.tar.gz" -C "$HOME/TFG_tools"
+  bash -n "$HOME/TFG_tools/B9_3_8k_lote/ejecutar_B9_3_8k.sh"
+  bash "$HOME/TFG_tools/B9_3_8k_lote/ejecutar_B9_3_8k.sh"
+
+Resultado para compartir:
+  ~/TFG_tools/B9_3_8k_resultados.tar.gz
+
+El PASS de FENCE en el testbench actual NO garantiza todas las propiedades
+de ordenamiento frente a dispositivos/otros agentes. El RTL implementa
+FENCE como no-op, hipótesis a auditar para memoria/expansión antes del cierre.
+Las pruebas privilegiadas siguen desactivadas y algunos parámetros UDB/Sail
+son provisionales. No implica certificación integral del procesador.
+
+No sobrescribir resultados de otros lotes ni modificar RTL ante un FAIL.

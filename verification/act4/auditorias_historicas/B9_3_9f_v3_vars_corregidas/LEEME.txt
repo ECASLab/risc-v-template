@@ -1,0 +1,22 @@
+# B.9.3.9f-v3 - core_top + IMEM: correccion de variables Bash
+
+Objetivo: ejecutar el mismo testbench y Makefile de v2 sin tocar el RTL.
+Fallo de v2: `set -u` y una sola sentencia `local id=... name=... vvpfile=...$name...`.
+En v3 se asignan `id`, `name`, `target`, `vvpfile`, `log` y `compilelog`
+por separado, evitando expandir `name` antes de inicializarla.
+
+Archivos `runner.mk` y `tb_core_imem_integracion.sv` son identicos
+byte por byte a los de v2. Se mantienen los cinco casos, la validacion SHA-256,
+la comprobacion de solicitudes y resultados, la prohibicion de sobrescritura
+y la conservacion de logs en caso de fallo.
+
+Instalacion desde ~/Descargas:
+  tar -xzf "$HOME/Descargas/B9_3_9f_v3_vars_corregidas.tar.gz" -C "$HOME/TFG_tools"
+  bash -n "$HOME/TFG_tools/B9_3_9f_v3_vars_corregidas/ejecutar_B9_3_9f_v3.sh"
+  bash "$HOME/TFG_tools/B9_3_9f_v3_vars_corregidas/ejecutar_B9_3_9f_v3.sh"
+
+Resultado para compartir:
+  ~/TFG_tools/B9_3_9f_v3_resultados.tar.gz
+
+La verificacion local del script mediante simulacion del orquestador con comandos
+sustitutos no reemplaza las cinco simulaciones SystemVerilog reales en Ubuntu.

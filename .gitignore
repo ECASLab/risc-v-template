@@ -27,3 +27,8 @@ Thumbs.db
 sim
 Comandos.txt
 results.xml
+
+# TFG: artefactos ACT4 generados localmente (no las fuentes ni informes)
+/verification/act4/**/work/
+/verification/act4/**/build/
+/verification/act4/**/obj_dir/

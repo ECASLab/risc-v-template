@@ -1,0 +1,20 @@
+TFG — B.9.3.9c: análisis aislado de PHYS_ADDR_WIDTH
+
+OBJETIVO
+Crear dos candidatas coherentes (UDB/Sail 32/32 y 56/56), someterlas al validador
+real de ambas herramientas y preservar los archivos con los que ACT4 aprobó 51/51.
+
+PRECAUCIONES
+- No modifica RTL, Git, ni los archivos YAML/JSON originales.
+- No cambia los testbenches ni repite ACT4.
+- Incluso 4 validaciones PASS no prueban cuál es el ancho físico implementado.
+- PMA_GRANULARITY, Zicsr y FENCE se analizarán después por separado.
+- Si el archivo fuente original ha cambiado respecto al último diagnóstico, el script
+  se detiene antes de modificar nada.
+
+EJECUCION
+bash -n "$HOME/TFG_tools/B9_3_9c_anchos/ejecutar_B9_3_9c.sh"
+bash "$HOME/TFG_tools/B9_3_9c_anchos/ejecutar_B9_3_9c.sh"
+
+SALIDA
+~/TFG_tools/B9_3_9c_resultados.tar.gz

@@ -1,0 +1,88 @@
+{
+  "core_head": "cf78be1cc7206879744f7587ab9806a508113b24",
+  "act4_head": "d6094ad3ede5268b454197e7bb8eb1cbcbe140d0",
+  "paths": {
+    "core": "/run/media/saul/Data/Documentos/Linux/TFG_downloads/riscv-core-project/risc-v-template",
+    "act4": "/home/saul/TFG_tools/riscv-arch-test",
+    "config": "/home/saul/TFG_tools/B9_3_7d_primer_elf/config"
+  },
+  "sha256": {
+    "core_top.sv": "cdc92a0bcd5841a14a0e63fb4a5a9eca140c395b1dd853359663277671d491f7",
+    "csr_file.sv": "c26a5497051412a7d1a1ab2fbf7efbbe74a627a805acaa391f912092f9e04a8c",
+    "decoder.sv": "c7a43aa86b9b69ed0d334fb0b225b68d7541f03bc121ef3f9b2a455e8290353f",
+    "imem_sync_model.sv": "9d4a22ab33992d93abce7727cd6ced2ef9914f20404eac807cc40ca5ef818446",
+    "dmem_sync_model.sv": "5e2f7f52c3c4776cb381aa4fd846948fbb1f88f9f24b9250499d6dc775c11a33",
+    "tfg-rv64i.yaml": "056eecbfcd0973cede1464c4e8c19c89e8bfba3627e6decaa07f67d70461a6c1",
+    "sail.json": "c2000c9c85ffde07517fb581e5af520d8709886ea942e15583c30d6a803772ea",
+    "test_config.yaml": "b857bedc54e7a3421d83ffdc789bcaf709a54c70c76b3222c85300b9ee4ddac3",
+    "link.ld": "a58267ba92174cbdc5f5bcbe836d10c99971ce26b894a5d9e5d8f5b76d851a0b",
+    "rvmodel_macros.h": "6e73211b03cd663eb7e511928eba8a5427971cc2e106fc0034e683085e3098fa"
+  },
+  "extensions_udb": {
+    "I": "= 2.1",
+    "Sm": "= 1.11.0"
+  },
+  "udb": {
+    "MXLEN": "64",
+    "PHYS_ADDR_WIDTH": "56",
+    "PMA_GRANULARITY": "3",
+    "NUM_PMP_ENTRIES": "0",
+    "MISALIGNED_LDST": "false",
+    "MTVEC_MODES": "[0]"
+  },
+  "sail": {
+    "physaddr_bits": 32,
+    "regions": [
+      {
+        "type": "IOMemory",
+        "base": "0x2000000",
+        "size": "0xc000",
+        "end_exclusive": "0x200c000"
+      },
+      {
+        "type": "IOMemory",
+        "base": "0xc000000",
+        "size": "0x1000",
+        "end_exclusive": "0xc001000"
+      },
+      {
+        "type": "IOMemory",
+        "base": "0x10000000",
+        "size": "0x1000",
+        "end_exclusive": "0x10001000"
+      },
+      {
+        "type": "MainMemory",
+        "base": "0x80000000",
+        "size": "0x100000",
+        "end_exclusive": "0x80100000"
+      }
+    ]
+  },
+  "test_config": {
+    "include_priv_tests": "false",
+    "name": "tfg-rv64i-clang22"
+  },
+  "csr_rtl_addresses": {
+    "MSTATUS": "0x300",
+    "MISA": "0x301",
+    "MTVEC": "0x305",
+    "MEPC": "0x341",
+    "MCAUSE": "0x342",
+    "MTVAL": "0x343",
+    "MVENDORID": "0xf11",
+    "MARCHID": "0xf12",
+    "MIMPID": "0xf13",
+    "MHARTID": "0xf14"
+  },
+  "rtl_address_bus": {
+    "imem_addr_64": true,
+    "dmem_addr_64": true
+  },
+  "warnings": [
+    "Desacuerdo de ancho de dirección física: UDB=56 bits, Sail=32 bits.",
+    "UDB declara Sm sin Zicsr: configuración provisional de pruebas I, no acreditación privilegiada.",
+    "El decoder documenta FENCE como no-op; revisar ordenamiento MMIO por separado.",
+    "PMA_GRANULARITY=3 es un supuesto declarado, pendiente de justificación frente a la plataforma."
+  ]
+}

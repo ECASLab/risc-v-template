@@ -1,0 +1,15 @@
+B.9.3.9a - Auditoria de cierre ACT4 y prueba de no regresion
+2026-10-23T12:00:28-06:00
+CORE=/run/media/saul/Data/Documentos/Linux/TFG_downloads/riscv-core-project/risc-v-template
+CORE HEAD=cf78be1cc7206879744f7587ab9806a508113b24
+ACT4 HEAD=d6094ad3ede5268b454197e7bb8eb1cbcbe140d0
+
+VERSIONES HERRAMIENTAS
+Icarus Verilog version 12.0 (stable) ()
+riscv64-unknown-elf-gcc (14.2.0+19) 14.2.0
+Ubuntu clang version 22.1.2 (1ubuntu1)
+CORE STATUS INICIAL:
+?? .tar.gz
+?? chat_handoff/
+?? tfg_high_base_step1.patch
+ACT4 STATUS:

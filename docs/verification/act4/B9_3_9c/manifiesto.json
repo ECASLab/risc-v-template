@@ -1,0 +1,25 @@
+{
+  "fuente_udb": "/home/saul/TFG_tools/B9_3_7d_primer_elf/config/tfg-rv64i.yaml",
+  "fuente_sail": "/home/saul/TFG_tools/B9_3_7d_primer_elf/config/sail.json",
+  "sha256_udb_original": "056eecbfcd0973cede1464c4e8c19c89e8bfba3627e6decaa07f67d70461a6c1",
+  "sha256_sail_original": "c2000c9c85ffde07517fb581e5af520d8709886ea942e15583c30d6a803772ea",
+  "ancho_udb_original": 56,
+  "ancho_sail_original": 32,
+  "candidatas": [
+    {
+      "bits": 32,
+      "udb_yaml": "/home/saul/TFG_tools/B9_3_9c_resultados/pa_32/tfg-rv64i.yaml",
+      "sail_json": "/home/saul/TFG_tools/B9_3_9c_resultados/pa_32/sail.json",
+      "sha256_udb": "851b6f943bec2d5108ebe54f649a9bbf288680e090953bdcc8256329b0f962af",
+      "sha256_sail": "c2000c9c85ffde07517fb581e5af520d8709886ea942e15583c30d6a803772ea"
+    },
+    {
+      "bits": 56,
+      "udb_yaml": "/home/saul/TFG_tools/B9_3_9c_resultados/pa_56/tfg-rv64i.yaml",
+      "sail_json": "/home/saul/TFG_tools/B9_3_9c_resultados/pa_56/sail.json",
+      "sha256_udb": "056eecbfcd0973cede1464c4e8c19c89e8bfba3627e6decaa07f67d70461a6c1",
+      "sha256_sail": "c5a05f820ce1b65f64958131aa18524a4d0174c1e26e8122c315999e373dec93"
+    }
+  ],
+  "advertencia": "Una validacion de UDB y Sail no determina por si sola el PA soportado por el hardware. No sustituir config ni declarar conformidad."
+}

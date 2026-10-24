@@ -1,0 +1,6 @@
+caso,resultado,exit_simulador,causa
+valido_base,PASS,0,fetch_valido_core_integrado
+invalido_fin,PASS,1,fatal_esperado_modelo_IMEM
+invalido_inferior,PASS,1,fatal_esperado_modelo_IMEM
+invalido_mas_2p32,PASS,1,fatal_esperado_modelo_IMEM
+invalido_mas_2p56,PASS,1,fatal_esperado_modelo_IMEM
