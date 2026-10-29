@@ -1,6 +1,7 @@
 TFG - CONTEXTO TECNICO Y PUNTO DE REANUDACION
 ================================================
-Fecha de refinamiento: 2026-10-23 19:07 -0600
+Fecha de refinamiento inicial: 2026-10-23 19:07 -0600
+Actualizacion de pruebas locales: 2026-10-29
 Proyecto: Desarrollo y verificacion de un nucleo RISC-V RV64I con interfaz de expansion para aceleradores en FPGA.
 Repositorio principal: /run/media/saul/Data/Documentos/Linux/TFG_downloads/riscv-core-project/risc-v-template
 Rama: main
@@ -27,6 +28,21 @@ ESTADO FUNCIONAL ACREDITADO HISTORICAMENTE
 - Regresion local historica: 35 PASS; prueba FENCE/MMIO dirigida: dos escenarios PASS.
 - Estas cifras provienen de reportes historicos, NO de una nueva ejecucion tras reorganizar.
 
+VALIDACIONES LOCALES DOCUMENTADAS (2026-10-29)
+---------------------------------------------
+- Commit HEAD informado: 568db781f77bc9e451a63dacfc7f267f92ccbbb5.
+- IMPORTANTE: las pruebas fueron ejecutadas con cambios locales en Makefile,
+  TFG_HANDOFF.txt y archivos nuevos aun no versionados; HEAD no identifica
+  por si solo el conjunto exacto de fuentes ensayado.
+- P0.1: make regression, make lint y make baremetal-probe con EXIT_CODE=0.
+- P1.1: make baremetal-accelerator con EXIT_CODE=0; RESULT=0x11223344556677aa,
+  7 accesos MMIO (4 escrituras y 3 lecturas), 1/1 transacciones DMEM,
+  144 ciclos reportados por el testbench.
+- P1.2: make lint-baremetal-accelerator con EXIT_CODE=0; make regression
+  y make lint nuevamente con EXIT_CODE=0, ambos incluyendo el acelerador.
+- Estos resultados locales NO implican que ACT4 se haya repetido ni que se
+  haya sintetizado/implementado el sistema en FPGA.
+
 CONFIGURACION DE DIRECCIONES
 ----------------------------
 - Mapa utilizado en los programas de alta base: RAM_BASE=0x80000000, RAM=1 MiB, RESET_PC=0x80000000.
@@ -41,7 +57,9 @@ CONFIGURACION Y LIMITACIONES ABIERTAS
 - Conciliar PHYS_ADDR_WIDTH UDB (56) y Sail (32), PMA_GRANULARITY, declaraciones Zicsr y CSR/traps.
 - El modelo IMEM rechaza solicitudes invalidas mediante $fatal: NO demuestra trap arquitectural instruction access fault.
 - El alcance verificado de FENCE/MMIO es el orden serializado observado, no todos los modelos de memoria.
-- Pendiente: demostrar acelerador con un programa bare-metal completo, top FPGA, memoria sintetizable, XDC, timing, bitstream.
+- Demostracion software-core-acelerador bare-metal: PASS en simulacion RTL (P1.1/P1.2).
+- Pendiente: top FPGA, memorias sintetizables, XDC, cierre de timing, bitstream
+  y demostracion en la tarjeta fisica.
 - Vivado no estaba disponible en PATH del diagnostico; no equivale a desinstalado.
 
 COMANDOS DE VERIFICACION DEL REPOSITORIO
@@ -50,6 +68,8 @@ cd /run/media/saul/Data/Documentos/Linux/TFG_downloads/riscv-core-project/risc-v
 make regression
 make lint
 make baremetal-probe
+make baremetal-accelerator
+make lint-baremetal-accelerator
 git status --short
 NOTA: los runners historicos ACT4 aun pueden referir rutas absolutas en ~/TFG_tools; antes de ejecutarlos, auditarlas.
 
@@ -223,12 +243,15 @@ INVENTARIO VERSIONADO POR DIRECTORIO
 
 PROXIMAS ACTIVIDADES
 --------------------
-1. Cerrar revision Git y los artefactos sueltos sin borrar evidencias.
-2. Verificar make regression, make lint y make baremetal-probe en el mismo commit.
-3. Comprobar reproducibilidad ACT4 en el repositorio reorganizado (sin inventar pass).
-4. Seleccionar FPGA e integrar un programa que controle y lea el acelerador.
-5. Completar documentacion, temporizacion, utilizacion y demostracion FPGA.
+1. Revisar y versionar selectivamente las fuentes nuevas del acelerador.
+2. Conservar evidencia de las pruebas P0.1/P1.1/P1.2 con commit y versiones
+   de herramientas; no mezclar estas pruebas con los 51 PASS ACT4 historicos.
+3. Identificar FPGA objetivo, tarjeta, part number y disponibilidad de Vivado.
+4. Desarrollar top de plataforma y memoria sintetizable; validar simulacion.
+5. Ejecutar sintesis, implementacion, timing, bitstream y demo en hardware.
 
 ESTADO DEL COMMIT
 -----------------
-Este handoff se genero ANTES del commit de organizacion; no implica que se haya confirmado nada.
+- Ultimo HEAD confirmado por el usuario: 568db781f77bc9e451a63dacfc7f267f92ccbbb5.
+- El codigo del acelerador y su integracion en Makefile estaban en el arbol
+  local de trabajo; pendiente crear un nuevo commit de cierre.

@@ -560,3 +560,4 @@ clean-vcd:
 > @rm -f tb/*.vcd
 > @rm -f tb/tb_sv/*.vcd
 > @rm -f $(BUILD_DIR)/*.vcd
+include mk/baremetal_accelerator.mk

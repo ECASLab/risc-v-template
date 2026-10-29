@@ -1,0 +1,49 @@
+TFG - CIERRE DE VERIFICACION P1
+Fecha: 2026-10-29
+
+=== GIT ===
+568db781f77bc9e451a63dacfc7f267f92ccbbb5
+ M Makefile
+ M TFG_HANDOFF.txt
+?? P1_2_integrar_acelerador.patch
+?? P1_3_actualizar_handoff.patch
+?? README_INSTALACION.txt
+?? TFG_baremetal_acelerador_p2.tar.gz
+?? docs/verification/acelerador_p1/
+?? mk/
+?? sw/baremetal/accelerator/
+?? tb/tb_sv/tb_core_baremetal_accelerator.sv
+
+=== HERRAMIENTAS ===
+Verilator 5.032 2025-01-01 rev (Debian 5.032-1)
+Icarus Verilog version 12.0 (stable) ()
+riscv64-unknown-elf-gcc (14.2.0+19) 14.2.0
+
+=== EVIDENCIAS ===
+--- P1_1_baremetal_accelerator ---
+93388f30fcace5f2db735a6ec3bfde84c68e357aa7792593f1e6e6e2d52f2144  build/diagnostico/P1_1_baremetal_accelerator.log
+PASS: bare-metal accelerator MMIO
+PASS: baremetal-accelerator completado
+--- P1_2_lint_acelerador ---
+2a689ea18abcd4e5388cf064e924c7aad037d0e2c3a32236bd5845f329adc6b2  build/diagnostico/P1_2_lint_acelerador.log
+PASS: lint bare-metal accelerator completado
+--- P1_2_regression ---
+f46b97ac68f47e808ca9e2b9e31fe1c8aa6d9f479a3819791704c9fb10ea998f  build/diagnostico/P1_2_regression.log
+PASS: tb_exp_axi4lite_master_bridge
+PASS: tb_core_expansion_axi4lite_wait cycles=35
+PASS: CSR y MRET preservan precisión durante wait-states
+PASS: tb_core_expansion_axi4lite_load_fault cycles=35
+PASS: tb_core_expansion_axi4lite_store_fault cycles=35
+PASS: bare-metal accelerator MMIO
+PASS: baremetal-accelerator completado
+PASS: regresión local con Icarus completada
+--- P1_2_lint ---
+92b613f9ddb289f5dda0554625bf1c934d739fe312c79923f88bbe09da925d4d  build/diagnostico/P1_2_lint.log
+PASS: lint tb_exp_axi4lite_master_bridge completado
+PASS: lint tb_core_expansion_axi4lite_wait completado
+PASS: lint tb_core_expansion_priv_wait completado
+PASS: lint tb_core_expansion_axi4lite_load_fault completado
+PASS: lint tb_core_expansion_axi4lite_store_fault completado
+PASS: lint tb_core_mem_sizes completado
+PASS: lint bare-metal accelerator completado
+PASS: lint completado
