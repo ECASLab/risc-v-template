@@ -253,18 +253,6 @@ module core_top #(
         logic [63:0] trap_taken_cause;
         logic [63:0] trap_taken_value;
 
-        // Lógica de generación de señales de stall y flush (por ahora solo se implementa el hazard de tipo load-use con un stall hacia IF/ID, el resto de señales se dejan en 0 para no tener stalls ni flushes adicionales)
-        assign load_use_hazard =
-            id_valid_out &&
-            ex_valid_out &&
-            ex_mem_read_out &&
-            !ex_illegal_instr_out &&
-            (ex_rd_addr_out != 5'd0) &&
-            (
-                (id_rs1_used && (id_rs1_addr == ex_rd_addr_out)) ||
-                (id_rs2_used && (id_rs2_addr == ex_rd_addr_out))
-            );
-
         // data_hazard_stall conserva el caso clásico load-use.
         // Si MEM está esperando un periférico/AXI, el stall global tiene prioridad
         // y no se debe insertar una burbuja nueva en ID/EX.
@@ -688,6 +676,18 @@ module core_top #(
         logic        ex_csr_use_imm_out;
         logic        ex_csr_read_out;
         logic        ex_csr_write_out;
+
+        // Lógica de generación de señales de stall y flush (por ahora solo se implementa el hazard de tipo load-use con un stall hacia IF/ID, el resto de señales se dejan en 0 para no tener stalls ni flushes adicionales)
+        assign load_use_hazard =
+            id_valid_out &&
+            ex_valid_out &&
+            ex_mem_read_out &&
+            !ex_illegal_instr_out &&
+            (ex_rd_addr_out != 5'd0) &&
+            (
+                (id_rs1_used && (id_rs1_addr == ex_rd_addr_out)) ||
+                (id_rs2_used && (id_rs2_addr == ex_rd_addr_out))
+            );
 
         // Registros ID/EX con lógica de stall y flush que pasan las señales desde ID hacia EX (y también hacia MEM y WB para las señales que necesitan llegar hasta esas etapas)
         id_ex_reg u_id_ex_reg (
