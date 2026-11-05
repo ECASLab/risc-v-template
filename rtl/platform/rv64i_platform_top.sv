@@ -20,7 +20,10 @@ module rv64i_platform_top #(
     output logic        boot_gnt_o,
     output logic        boot_rvalid_o,
     output logic [63:0] boot_rdata_o,
-    output logic        boot_error_o
+    output logic        boot_error_o,
+
+    // Marcador de demostracion visible en ejecucion: 0=sin resultado, 1=PASS, 2=FAIL.
+    output logic [1:0]  result_code_o
 );
     logic core_rst;
     assign core_rst = rst || !run_i;
@@ -86,6 +89,32 @@ module rv64i_platform_top #(
         .exp_ready_o(exp_ready), .exp_rdata_o(exp_rdata),
         .exp_error_o(exp_error)
     );
+
+    // Monitor pasivo del marcador definido por sw/baremetal/accelerator/start.S.
+    // Solo considera escrituras confirmadas (respuesta DMEM sin error).
+    // No altera el datapath ni la interfaz de memoria del nucleo.
+    localparam logic [63:0] RESULT_ADDR = RAM_BASE + 64'h300;
+    logic result_pending_q;
+    logic [1:0] pending_code_q;
+    always_ff @(posedge clk) begin
+        if (rst || !run_i) begin
+            result_pending_q <= 1'b0;
+            pending_code_q <= 2'b00;
+            result_code_o <= 2'b00;
+        end else begin
+            if (dmem_rvalid) begin
+                if (result_pending_q && !dmem_error)
+                    result_code_o <= pending_code_q;
+                result_pending_q <= 1'b0;
+            end
+            if (dmem_req && dmem_gnt && dmem_we &&
+                dmem_addr == RESULT_ADDR && dmem_wstrb == 8'hff) begin
+                result_pending_q <= 1'b1;
+                pending_code_q <= (dmem_wdata == 64'd1) ? 2'd1 :
+                                  (dmem_wdata == 64'd2) ? 2'd2 : 2'd0;
+            end
+        end
+    end
 
     // Interfaz dmem_size se usa internamente por core_top; la RAM
     // utiliza el strobe byte-wide generado por core para la escritura.
