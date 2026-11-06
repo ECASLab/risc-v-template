@@ -1,0 +1,35 @@
+// P2.9.2 - CANDIDATO DE OVERLAY; NO CARGAR AUN.
+// Basado en la estructura oficial K26 y en DTG Zynq UltraScale+.
+/dts-v1/;
+/plugin/;
+
+&fpga_full {
+    #address-cells = <2>;
+    #size-cells = <2>;
+    firmware-name = "rv64i_tfg_kv260.bit.bin";
+    resets = <&zynqmp_reset 116>, <&zynqmp_reset 117>,
+             <&zynqmp_reset 118>, <&zynqmp_reset 119>;
+};
+
+&amba {
+    #address-cells = <2>;
+    #size-cells = <2>;
+    // PL0, ID 71: objetivo de 17 ns = aprox. 58.824 MHz.
+    clocking0: clocking0 {
+        compatible = "xlnx,fclk";
+        #clock-cells = <0>;
+        clocks = <&zynqmp_clk 71>;
+        clock-output-names = "fabric_clk";
+        assigned-clocks = <&zynqmp_clk 71>;
+        assigned-clock-rates = <58823529>;
+    };
+
+    // Ventana del supervisor desde ARM. No se declara un driver automatico.
+    rv64i_supervisor@a0000000 {
+        compatible = "tfg,rv64i-axi-supervisor-1.0";
+        reg = <0x0 0xa0000000 0x0 0x1000>;
+        clocks = <&zynqmp_clk 71>;
+        clock-names = "s_axi_aclk";
+        status = "okay";
+    };
+};
