@@ -103,7 +103,7 @@ static int overlay_is_applied(void) {
         int n=snprintf(path,sizeof(path),"%s/%s/status",root,ent->d_name);
         if (n<0 || (size_t)n>=sizeof(path)) continue;
         if (strstr(ent->d_name,"k26-starter-kits") && file_has_string(path,"applied")) reference=1;
-        if (strstr(ent->d_name,"rv64i_tfg") && file_has_string(path,"applied")) match=1;
+        if (strstr(ent->d_name,"tfg-rv64i-kv260_image_") && file_has_string(path,"applied")) match=1;
     }
     closedir(dir);
     if (reference) { fprintf(stderr,"ERROR: overlay original sigue aplicado\n"); return 0; }

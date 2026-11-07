@@ -1,3 +1,28 @@
+# Estado actualizado — P2.9.4 (2026-11-06)
+
+Se probó `rv64i_arm_loader.c` en la KV260 ARM64 y se completó **una** ejecución
+física satisfactoria (`RESULT_FLAG=1`, código de salida 0). Se corrigió la
+comprobación del overlay de `rv64i_tfg` a `tfg-rv64i-kv260_image_`.
+
+El commit de referencia anterior a la integración es `a3c0e5f`. Los scripts
+de pruebas se conservaron en `sw/host/p2_9_4_tests/`. La documentación de
+resultados está en `docs/verification/fpga/kria_p2_9_4/`.
+
+Para comprobación offline, sin hardware:
+
+```bash
+gcc -std=c11 -O2 -Wall -Wextra -Wpedantic -Werror \
+    -o /tmp/rv64i_arm_loader rv64i_arm_loader.c
+/tmp/rv64i_arm_loader --image /ruta/accelerator.bin --check-image
+```
+
+**No iniciar el core por defecto.** `--execute --confirm-hardware` opera
+sobre `/dev/mem` y requiere verificar antes firmware, reloj, ventilación
+y procedimiento ECASLab de recuperación. Repetibilidad y restauración
+aún pendientes. El texto siguiente corresponde a la fase histórica P2.9.3.
+
+---
+
 # P2.9.3 — Aplicación ARM para supervisar RV64I (candidata)
 
 Esta versión se deriva de **`rtl/platform/rv64i_axi_supervisor.sv`** y del testbench P2.7.1. No configura ni programa la FPGA; solo comunica con el hardware **después** de que otro procedimiento seguro haya aplicado el firmware correcto.

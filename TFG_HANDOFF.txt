@@ -1,3 +1,30 @@
+ESTADO ACTUALIZADO — KRIA KV260, 2026-11-06 (PRIORIDAD SOBRE SECCIONES HISTORICAS)
+==============================================================================
+Repo de trabajo: /home/saulramirez/tfg_rv64i, rama fpga/platform-uram.
+Commit base antes de integrar las pruebas de Kria: a3c0e5fd0ca9243d00e63ce85b498f52c1f805c0.
+
+P2.9.4: La imagen PL_FLAT tfg-rv64i-kv260 fue cargada correctamente en
+KV260 revB; Device Tree overlay aplicado; pl0_ref=58 823 529 Hz.
+El supervisor AXI4-Lite 0xA0000000/0x1000 respondió lecturas y escrituras.
+UltraRAM: lectura/escritura de un patrón de 64 bits PASS; carga y lectura
+de 97/97 palabras (776 bytes) PASS; RUN permaneció en 0 durante carga.
+Primera ejecución física: PASS, RESULT_FLAG=1, POLLS=1, loader ARM EXIT 0.
+El bitstream, RTL y reportes Vivado de 2024.1 NO cambiaron.
+Corrección de software: solo cambió el nombre del overlay buscado en
+sw/host/rv64i_arm_loader.c a tfg-rv64i-kv260_image_.
+
+Evidencia: docs/verification/fpga/kria_p2_9_4/RESULTADOS_PRIMERA_EJECUCION.md;
+archivos originales en el snapshot de Kria y paquetes de transferencia.
+PENDIENTE: segunda ejecución para repetibilidad y prueba real de restauración
+del firmware k26-starter-kits (XRT_FLAT); no afirmar cierre definitivo.
+Seguir protocolo de ventilación y recuperación ECASLab.
+
+IMPORTANTE: El texto a continuación es un registro historico de etapas
+anteriores. Sus referencias a ausencia de bitstream/FPGA o carga pendiente
+quedan superadas por la actualización anterior.
+
+------------------------------------------------------------------------------
+
 TFG - CONTEXTO TECNICO Y PUNTO DE REANUDACION
 ================================================
 Fecha de refinamiento inicial: 2026-10-23 19:07 -0600
