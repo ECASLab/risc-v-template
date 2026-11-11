@@ -1,0 +1,26 @@
+{
+  "fecha_auditoria": "2026-11-10T15:30:16.659197-06:00",
+  "core_commit": "8a8e74382ddc6e65908fdf6134c06bdd0b1c44ed",
+  "act4_commit": "d6094ad3ede5268b454197e7bb8eb1cbcbe140d0",
+  "total": 51,
+  "pass": 51,
+  "fail": 0,
+  "lotes": {
+    "B6": 1,
+    "B7": 3,
+    "B8": 8,
+    "B9": 8,
+    "B10": 8,
+    "B11": 8,
+    "B12": 8,
+    "B13": 7
+  },
+  "diferencias_metricas_historicas": 0,
+  "casos_con_diferencias": [],
+  "alcance": "51 casos RV64I seleccionados",
+  "limitaciones": [
+    "Pruebas privilegiadas desactivadas",
+    "UDB Sm provisional",
+    "No equivale a certificacion RISC-V completa"
+  ]
+}
