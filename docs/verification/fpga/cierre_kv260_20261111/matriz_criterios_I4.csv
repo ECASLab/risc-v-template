@@ -1,0 +1,4 @@
+criterio,evidencia,resultado,limitacion
+I4-1,Bitstream implementado; carga efectiva del firmware RV64I en la KV260,EVIDENCIA_FAVORABLE,La demostracion acredita el diseno y firmware ensayados
+I4-2,WNS=1.245 ns; TNS=0 ns; enrutamiento y DRC sin errores,EVIDENCIA_FAVORABLE,Cumplimiento de restricciones reportadas; no acredita Fmax experimental
+I4-3,Dos demostraciones fisicas PASS; RESULT_FLAG=1; restauracion verificada,EVIDENCIA_FAVORABLE,Dos ejecuciones de un programa seleccionado; no constituye ensayo exhaustivo

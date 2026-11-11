@@ -1,0 +1,8 @@
+indicador,primera_ejecucion,segunda_ejecucion,coincide
+Tamano programa,776,776,SI
+Palabras del programa,97,97,SI
+Direccion RAM,0x80000000,0x80000000,SI
+Palabras cargadas,97,97,SI
+RESULT_FLAG,1,1,SI
+POLLS,1,1,SI
+Resultado,PASS,PASS,SI

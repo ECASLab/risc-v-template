@@ -1,0 +1,9 @@
+--- first_run.log
++++ segunda_ejecucion.log
+@@ -1,5 +1,5 @@
++AVISO: el acceso MMIO puede bloquearse si el reloj AXI o el hardware falla.
+ IMAGE_VALID: 776 bytes, 97 palabras, RAM_BASE=0x80000000
+-AVISO: el acceso MMIO puede bloquearse si el reloj AXI o el hardware falla.
+ Cargando 97 palabras de 64 bits a RAM RV64I...
+ Carga validada. Iniciando RV64I...
+ PASS: ARM -> AXI4-Lite -> UltraRAM -> RV64I -> MMIO

@@ -1,0 +1,28 @@
+{
+  "fecha": "2026-11-11T12:45:40.961007-06:00",
+  "core_commit": "8a8e74382ddc6e65908fdf6134c06bdd0b1c44ed",
+  "documentacion_commit": "c5f33c37b35120982f0b5015ab1ce437f7aff525",
+  "herramienta": "Vivado 2024.1",
+  "fpga": "xck26-sfvc784",
+  "wns_ns": 1.245,
+  "tns_ns": 0.0,
+  "period_ns": 17.0,
+  "frequency_mhz": 58.824,
+  "resources": {
+    "clb_luts": 7246,
+    "clb_registers": 4784,
+    "block_ram_tiles": 0,
+    "uram": 32,
+    "dsp": 0
+  },
+  "routing_errors": 0,
+  "drc_violations": 0,
+  "physical_runs": 2,
+  "physical_pass": 2,
+  "result_flag": 1,
+  "criterios": {
+    "I4-1": "Bitstream generado y cargado en la KV260",
+    "I4-2": "Reportes de recursos y temporizacion satisfactorios",
+    "I4-3": "Dos ejecuciones funcionales verificadas"
+  }
+}

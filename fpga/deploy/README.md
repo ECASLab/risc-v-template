@@ -7,7 +7,9 @@ La aplicación ARM obtuvo una **primera ejecución PASS** con `RESULT_FLAG=1`.
 Los hashes y límites del ensayo se documentan en
 `docs/verification/fpga/kria_p2_9_4/RESULTADOS_PRIMERA_EJECUCION.md`.
 
-Aún falta verificar repetibilidad y restauración del firmware original.
+Actualización del 11 de noviembre de 2026: se completaron dos ejecuciones físicas satisfactorias del programa de demostración con `RESULT_FLAG=1`. La segunda ejecución confirmó `CONTROL=0` y se restauró `k26-starter-kits` al slot 0.
+La restauración se comprobó mediante DFX Manager, servicios activos y lecturas térmicas. No se acreditó una prueba funcional exhaustiva del overlay original ni medición independiente de RPM.
+Informe actualizado: `docs/verification/fpga/cierre_kv260_20261111/README.md`.
 No modificar `default_firmware` ni suponer control de ventilador validado
 por lectura RPM.
 
