@@ -113,9 +113,16 @@ pendientes.
 El directorio de ejecuciones puede configurarse
 mediante la variable `TFG_FPGA_RUNS_DIR`.
 
-La adaptación de portabilidad de estos scripts
-debe validarse en Vivado 2024.1 antes de
-declararse completamente reproducible.
+La adaptación de portabilidad fue validada en
+Vivado 2024.1 desde un clon independiente en la
+campaña D.6.8 (12 de noviembre de 2026).
+La reconstrucción alcanzó síntesis y routing,
+con WNS de +1,245 ns, WHS de +0,012 ns,
+cero violaciones DRC y cero de metodología.
+No se generó un nuevo bitstream ni se realizó
+otra prueba física.
+
+Consultar las [evidencias de reconstrucción](verification/fpga/reconstruccion_kv260_20261112_86a15be/README.md).
 
 ## 6. Síntesis e implementación
 

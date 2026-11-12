@@ -1,0 +1,97 @@
+{
+  "schema_version": 1,
+  "publication_status": "candidate_requires_review",
+  "commit": "86a15be163cf7bcf98d2fa6e4f3357163a3c18bd",
+  "original_archive_sha256": "c3d9be4323f18f198236dc6c94fd3989053cf2799f4c0beb8e02aeed7613c6cf",
+  "vivado_version": "2024.1",
+  "verification_scope": "implementation_through_route_design",
+  "bitstream_generated": false,
+  "physical_fpga_test_performed": false,
+  "transformation": "known_environment_identifiers_replaced",
+  "artifacts": [
+    {
+      "path": "ps_pl/bd_summary.txt",
+      "original_sha256": "13f66fda7d2bd2e392c498dcc1e4214afe041ee32d69f4d9b61f2835702dd3fd",
+      "distributed_sha256": "13f66fda7d2bd2e392c498dcc1e4214afe041ee32d69f4d9b61f2835702dd3fd",
+      "size_bytes": 345,
+      "substitutions": 0
+    },
+    {
+      "path": "implementacion/synth_utilization.rpt",
+      "original_sha256": "f8af799882f444c77a93efa6496bb236914d3e8aff2e705a045c3786ad174798",
+      "distributed_sha256": "739e7dd1c28cec2a9ce82980e0d8f4bf97afccfd68747e6511dd2093c277ef8d",
+      "size_bytes": 9123,
+      "substitutions": 1
+    },
+    {
+      "path": "implementacion/synth_check_timing.rpt",
+      "original_sha256": "06913cd0cd5d950947defd8aa8524f57b107e413b40bbee8d5ff676004167164",
+      "distributed_sha256": "c2e84ae66cd368e416cf153e6c9e8408c4ef607ca23fd64424025f8fbde436f2",
+      "size_bytes": 3232,
+      "substitutions": 1
+    },
+    {
+      "path": "implementacion/synth_timing.rpt",
+      "original_sha256": "4527c6b834a89086b1db148b2a100a5e348aad4f8690fe9ccb35b5fb8534a347",
+      "distributed_sha256": "d6cb560de556dda77106c0f7dd0cd26fda42e0d66d0b5c86fef28c1c584f51a4",
+      "size_bytes": 44620,
+      "substitutions": 1
+    },
+    {
+      "path": "implementacion/impl_utilization.rpt",
+      "original_sha256": "e143aaec7403d719122b61b6cdc746b3f1834a1e63388a29a3883784ae011898",
+      "distributed_sha256": "9eca77e3a3c97461880c4b94cac78d06c134878a937b2fd4894226f7749407f6",
+      "size_bytes": 12385,
+      "substitutions": 1
+    },
+    {
+      "path": "implementacion/impl_timing.rpt",
+      "original_sha256": "717a4407245730b010cb4d513682944e17b3cb2eb1be329e820f79a4e7d89cc7",
+      "distributed_sha256": "a177cd98f205e01319fafa856e3c990d62daac144b7d2fe5db3efe21ef2b9a10",
+      "size_bytes": 46198,
+      "substitutions": 1
+    },
+    {
+      "path": "implementacion/impl_check_timing.rpt",
+      "original_sha256": "41027dae0b7bfd191b838d6e88e163abcbf0af45bf49117549f797fc65844d0f",
+      "distributed_sha256": "39b1350d62b891e57c5b0530a449fec52554c89d0df33ff75046edabdff52289",
+      "size_bytes": 3220,
+      "substitutions": 1
+    },
+    {
+      "path": "implementacion/impl_drc.rpt",
+      "original_sha256": "2133697270753342e25c39ed123f3c00f21d09a5dac956ea5a71901b41ea0062",
+      "distributed_sha256": "77002ec963666c7e083e656aad4a1e358e09db73c194f297474c78a842b4629a",
+      "size_bytes": 1365,
+      "substitutions": 1
+    },
+    {
+      "path": "implementacion/impl_route_status.rpt",
+      "original_sha256": "f3b27de16e93407541741d84b2ac91ba9f342b3c60c575cc13ae73bf3d084ce5",
+      "distributed_sha256": "f3b27de16e93407541741d84b2ac91ba9f342b3c60c575cc13ae73bf3d084ce5",
+      "size_bytes": 588,
+      "substitutions": 0
+    },
+    {
+      "path": "implementacion/impl_methodology.rpt",
+      "original_sha256": "d859c5da6a9122d71ece3d7ea2142aa69fba027747e3997e9cef29d3b4393e00",
+      "distributed_sha256": "5ee4bb9f41dc69948ff074af1ee6c20bec4f0818a3ac3d0845c188b987b1799a",
+      "size_bytes": 1360,
+      "substitutions": 1
+    },
+    {
+      "path": "auditoria_final/final_drc.rpt",
+      "original_sha256": "05ec830cc9ba6b072d590c1968854cf8a62963a9823b82d5dc2e4bb14f8251a1",
+      "distributed_sha256": "4190aab38acc9789f72a9cb3fb415194097408d68632559f272666f7194fa1db",
+      "size_bytes": 1366,
+      "substitutions": 1
+    },
+    {
+      "path": "auditoria_final/final_timing.rpt",
+      "original_sha256": "81dcb6bc49229c480c6c8aab83c78d2acac510a36e4574ecc66b539229c4e392",
+      "distributed_sha256": "1f0722b47ac72aad246b02cf4a454751fbb7bfcf5aaf8260e2adcefb76fcdb2d",
+      "size_bytes": 46199,
+      "substitutions": 1
+    }
+  ]
+}

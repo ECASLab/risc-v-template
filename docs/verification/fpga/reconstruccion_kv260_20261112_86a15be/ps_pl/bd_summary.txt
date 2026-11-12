@@ -1,0 +1,9 @@
+PART=xck26-sfvc784-2LV-c
+BOARD=xilinx.com:kv260_som:part0:1.4
+AXI_CONTROL_BASE=0xA0000000
+AXI_CONTROL_RANGE=4K
+PS_MASTER=ps_0/M_AXI_HPM0_FPD
+PL_CLOCK=ps_0/pl_clk0
+PL_RESET=ps_0/pl_resetn0 -> rst_inv -> rst_pl -> soc_0/s_axi_aresetn
+BD_CELLS=/const_one /const_zero /fan_slice /ps_0 /rst_inv /rst_pl /sc_0 /soc_0
+ADDRESS_SEGMENT=/soc_0/S_AXI/reg0
