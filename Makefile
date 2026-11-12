@@ -306,6 +306,11 @@ help:
 > @echo "  make regress                 Ejecuta simulación + lint"
 > @echo "  make lint                    Ejecuta lint con Verilator"
 > @echo "  make list-tests              Lista los testbenches configurados"
+> @echo "  make baremetal-probe         Compila y simula probe RV64I"
+> @echo "  make baremetal-accelerator   Compila y simula acelerador MMIO"
+> @echo "  make check-tools             Comprueba Icarus y vvp"
+> @echo "  make check-verilator         Comprueba Verilator"
+> @echo "  make check-riscv-tools       Comprueba GCC, objcopy y Python"
 > @echo "  make run-one TB=<test>       Ejecuta un test específico"
 > @echo "  make regress-log             Guarda log de regresión en docs/verification/logs"
 > @echo "  make clean                   Limpia build"
@@ -320,7 +325,6 @@ help:
 > @echo "  make run-one TB=tb_core_expansion_mmio"
 > @echo "  make run-one TB=tb_core_expansion_fault_trap"
 > @echo "  make regress-log"
-> @echo "  make baremetal-probe          Compila y ejecuta el probe bare-metal RV64I"
 
 # ------------------------------------------------------------
 # Directorios
