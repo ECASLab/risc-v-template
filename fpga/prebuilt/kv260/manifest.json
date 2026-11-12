@@ -1,0 +1,38 @@
+{
+  "schema_version": 1,
+  "distribution_status": "pending_authorization",
+  "project": "ECASLab/risc-v-template",
+  "board": "AMD Kria KV260",
+  "device": "xck26-sfvc784-2LV-c",
+  "vivado_version": "2024.1",
+  "firmware_type": "PL_FLAT",
+  "historical_artifact_revision": "8a8e743",
+  "repository_preparation_commit": "ce68d46",
+  "artifacts": [
+    {
+      "path": "firmware/tfg-rv64i-kv260/shell.json",
+      "size_bytes": 30,
+      "sha256": "e216af02289d51c4417805ca2d897a7e8b81db0b0b59e8ef786a15bb8e922b7a"
+    },
+    {
+      "path": "firmware/tfg-rv64i-kv260/rv64i_tfg_kv260.bit.bin",
+      "size_bytes": 7797692,
+      "sha256": "a7d0e3c7990d188fc616a2544030935fd1ed77b999a3243bd984430530c27cd6"
+    },
+    {
+      "path": "firmware/tfg-rv64i-kv260/rv64i_tfg_kv260.dtbo",
+      "size_bytes": 1354,
+      "sha256": "5d04ca5c85dfae7e115c4a4effca8d0ed9dea1d7aec04d53c1f8b31544136046"
+    },
+    {
+      "path": "software/accelerator.bin",
+      "size_bytes": 776,
+      "sha256": "52a2f729e547c67f9b70309a2de964bea3f6f29afe0d4a19257a26cfb31755af"
+    },
+    {
+      "path": "software/rv64i_arm_loader_first_run",
+      "size_bytes": 18592,
+      "sha256": "2a80bb1db1a228a3d3bcca23f5e5c7c87cf648f0aa9b8bc13cce6138f98bfb80"
+    }
+  ]
+}
