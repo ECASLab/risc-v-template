@@ -206,3 +206,7 @@ de terceros.
 
 Las guías de instalación, extensión y reconstrucción
 se consolidarán como parte de la entrega final.
+
+## Estado de entrega
+
+La preparación de la versión reutilizable y sus condiciones de distribución se documentan en [Estado de entrega](docs/release-readiness.md).
