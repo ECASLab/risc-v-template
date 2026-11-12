@@ -210,3 +210,7 @@ se consolidarán como parte de la entrega final.
 ## Estado de entrega
 
 La preparación de la versión reutilizable y sus condiciones de distribución se documentan en [Estado de entrega](docs/release-readiness.md).
+
+## Notas de entrega
+
+El contenido y las limitaciones de la versión preparada se describen en [Notas de entrega](docs/release-notes.md).
