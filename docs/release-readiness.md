@@ -3,11 +3,12 @@
 Este documento controla la preparación de la plataforma
 RV64I reutilizable para su distribución desde GitHub.
 
-Rama de preparación: `entrega/plataforma-reutilizable`.
+Rama de distribución: `main`.
+Rama de desarrollo conservada: `entrega/plataforma-reutilizable`.
 
-Corte técnico inicial de esta revisión: `86fb682`.
-La revisión definitiva deberá actualizarse al crear la
-versión de entrega.
+Corte técnico de reconstrucción: `86fb682`.
+Integración inicial en `main`: `c745409`.
+La etiqueta definitiva identificará la revisión publicada.
 
 ## 1. Uso de la plataforma
 
@@ -74,15 +75,18 @@ depende de contar con los permisos correspondientes.
 - [ ] Elegir y aprobar la licencia del repositorio.
 - [ ] Revisar atribuciones y licencias de terceros.
 - [ ] Resolver autorización para redistribuir firmware.
-- [ ] Completar revisión final de documentación.
+- [x] Completar revisión estática de documentación (D.7.d).
 - [ ] Conciliar objetivos y entregables del TFG.
-- [ ] Aprobar integración de la rama en main.
+- [x] Integrar la rama de entrega en `main` (D.7.h).
 - [ ] Crear etiqueta de versión y GitHub Release.
 - [ ] Verificar descarga desde GitHub.
 
 ## 6. Estado actual
 
-Distribución: pendiente de autorización.
+Código y documentación: integrados en `main`.
+GitHub Release: pendiente de preparación.
+Firmware de terceros: sujeto a las condiciones de
+redistribución aplicables.
 
 Este documento no concede una licencia, no sustituye
 la autorización institucional y no certifica que los

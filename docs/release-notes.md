@@ -5,8 +5,8 @@ Fecha de preparación: 12 de noviembre de 2026.
 Proyecto: Desarrollo y verificación de un núcleo RISC-V
 RV64I con interfaz de expansión para aceleradores en FPGA.
 
-Estado: candidato local de entrega, pendiente de integración
-en la rama principal y publicación de la versión.
+Estado: integrado en `main` el 12 de noviembre de 2026.
+La etiqueta y la GitHub Release están pendientes.
 
 ## 1. Componentes de la plataforma
 
@@ -106,15 +106,14 @@ Consultar [artefactos precompilados](../fpga/prebuilt/kv260/README.md).
   de las fuentes y evidencias de implementación.
 - La distribución de binarios debe ajustarse a las
   condiciones aplicables al repositorio académico.
-- La versión final requiere revisión e integración
-  con el repositorio administrado por el tutor.
+- La rama de entrega se integró en `main` mediante
+  fast-forward; no se requirió modificar el RTL.
 
 Consultar [estado de entrega](release-readiness.md).
 
 ## 6. Versión
 
-Estas notas describen el candidato de entrega local.
+Estas notas describen el contenido integrado en `main`.
 
-La etiqueta definitiva de versión y la GitHub Release
-se establecerán al integrar la revisión aprobada
-en la rama principal.
+La etiqueta de versión y los artefactos descargables
+se prepararán en GitHub Releases.
