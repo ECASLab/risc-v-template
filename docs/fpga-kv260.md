@@ -328,3 +328,12 @@ posteriores del RTL.
 Las condiciones específicas y los resultados
 numéricos de este TFG proceden del repositorio
 y las evidencias históricas del proyecto.
+
+## Reconstrucción del firmware
+
+Para generar archivos BIT/BIN desde una implementación
+previamente enrutada y preparar un paquete PL_FLAT,
+consultar la [guía de reconstrucción del firmware](rebuild-kv260-firmware.md).
+
+Esta operación es independiente de la validación física
+histórica de la KV260.
