@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 PKG="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO="$HOME/tfg_rv64i"
+REPO="$(cd -- "$PKG/../.." && pwd -P)"
 EXPECTED="0ba9c8a"
 [[ -d "$REPO/.git" ]] || { echo "ERROR: falta repositorio"; exit 2; }
-[[ "$(git -C "$REPO" branch --show-current)" == "fpga/platform-uram" ]] || { echo 'ERROR: rama distinta'; exit 3; }
 git -C "$REPO" merge-base --is-ancestor "$EXPECTED" HEAD || { echo 'ERROR: falta commit base validado'; exit 4; }
 [[ -z "$(git -C "$REPO" status --porcelain)" ]] || { echo 'ERROR: repositorio no limpio'; exit 5; }
 (cd "$REPO" && sha256sum -c "$PKG/source_wrapper.sha256")
 command -v vivado >/dev/null || { echo 'ERROR: Vivado no habilitado'; exit 6; }
-mkdir -p "$HOME/tfg_fpga_checks"
-RUN_DIR="$(mktemp -d "$HOME/tfg_fpga_checks/p2_8_1_bd_XXXXXX")"
+RUN_BASE="${TFG_FPGA_RUNS_DIR:-$HOME/tfg_fpga_checks}"
+mkdir -p "$RUN_BASE"
+RUN_DIR="$(mktemp -d "$RUN_BASE/p2_8_1_bd_XXXXXX")"
 echo "RUN_DIR=$RUN_DIR"
 export TFG_REPO="$REPO" P28_PKG="$PKG"
 cd "$RUN_DIR"

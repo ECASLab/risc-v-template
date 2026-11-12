@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Ejecutar SOLO en xrt-france, no modifica el repositorio ni la Kria.
 set -euo pipefail
-REPO="$HOME/tfg_rv64i"
+REPO="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd -P)"
 test -s "$REPO/sw/baremetal/accelerator/start.S"
 command -v riscv64-unknown-elf-gcc >/dev/null || { echo 'ERROR: habilita amd_202401_enable'; exit 2; }
 command -v riscv64-unknown-elf-objcopy >/dev/null || { echo 'ERROR: falta objcopy RISC-V'; exit 2; }

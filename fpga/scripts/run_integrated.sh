@@ -5,8 +5,9 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 for bin in riscv64-unknown-elf-gcc riscv64-unknown-elf-objcopy python3 xvlog xelab xsim vivado; do
     command -v "$bin" >/dev/null || { echo "ERROR: falta $bin"; exit 3; }
 done
-mkdir -p "$HOME/tfg_fpga_checks"
-RUN_DIR="$(mktemp -d "$HOME/tfg_fpga_checks/p2_6_3_repro_XXXXXX")"
+RUN_BASE="${TFG_FPGA_RUNS_DIR:-$HOME/tfg_fpga_checks}"
+mkdir -p "$RUN_BASE"
+RUN_DIR="$(mktemp -d "$RUN_BASE/p2_6_3_repro_XXXXXX")"
 export TFG_REPO="$REPO"
 cd "$RUN_DIR"
 echo "RUN_DIR=$RUN_DIR"

@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 PKG="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-REPO="$HOME/tfg_rv64i"
+REPO="$PKG"
 [[ -d "$REPO/.git" ]] || { echo 'ERROR: no existe repositorio'; exit 2; }
-[[ "$(git -C "$REPO" branch --show-current)" == 'fpga/platform-uram' ]] || { echo 'ERROR: rama Git inesperada'; exit 3; }
 git -C "$REPO" merge-base --is-ancestor 047aaef HEAD || { echo 'ERROR: falta commit base 047aaef'; exit 4; }
 [[ -z "$(git -C "$REPO" status --porcelain)" ]] || { echo 'ERROR: repositorio modificado'; exit 5; }
 for b in riscv64-unknown-elf-gcc riscv64-unknown-elf-objcopy python3 xvlog xelab xsim vivado; do
   command -v "$b" >/dev/null || { echo "ERROR: falta $b"; exit 6; }
 done
-RUN_DIR="$(mktemp -d "$HOME/tfg_fpga_checks/p2_7_1_axi_run_XXXXXX")"
+RUN_BASE="${TFG_FPGA_RUNS_DIR:-$HOME/tfg_fpga_checks}"
+mkdir -p "$RUN_BASE"
+RUN_DIR="$(mktemp -d "$RUN_BASE/p2_7_1_axi_run_XXXXXX")"
 export TFG_REPO="$REPO" P27_PKG="$PKG"
 cd "$RUN_DIR"
 echo "RUN_DIR=$RUN_DIR"
