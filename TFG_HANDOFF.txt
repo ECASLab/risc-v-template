@@ -1,3 +1,10 @@
+AVISO DE VIGENCIA — 2026-11-11
+Este archivo conserva una instantánea histórica del desarrollo.
+No representa el estado final del repositorio ni sustituye las guías
+vigentes. Consultar README.md, docs/getting-started.md,
+docs/expansion-interface.md y docs/fpga-kv260.md.
+Las actividades pendientes descritas abajo pueden estar completadas.
+
 ESTADO ACTUALIZADO — KRIA KV260, 2026-11-06 (PRIORIDAD SOBRE SECCIONES HISTORICAS)
 ==============================================================================
 Repo de trabajo: /home/saulramirez/tfg_rv64i, rama fpga/platform-uram.

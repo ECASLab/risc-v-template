@@ -1,5 +1,13 @@
 # Estado actualizado — P2.9.4 (2026-11-06)
 
+> **Nota de vigencia (11 de noviembre de 2026):** después de esta
+> etapa se completó una segunda ejecución física satisfactoria
+> y se verificó la restauración de `k26-starter-kits`.
+> Las indicaciones inferiores sobre actividades pendientes
+> reflejan el estado histórico del 6 de noviembre.
+> Consultar la [guía FPGA](../../docs/fpga-kv260.md) y el
+> [informe de cierre](../../docs/verification/fpga/cierre_kv260_20261111/README.md).
+
 Se probó `rv64i_arm_loader.c` en la KV260 ARM64 y se completó **una** ejecución
 física satisfactoria (`RESULT_FLAG=1`, código de salida 0). Se corrigió la
 comprobación del overlay de `rv64i_tfg` a `tfg-rv64i-kv260_image_`.

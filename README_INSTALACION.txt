@@ -1,3 +1,10 @@
+AVISO DE VIGENCIA — 2026-11-11
+Este documento conserva las instrucciones de una etapa histórica.
+Para comenzar desde cero, consultar docs/getting-started.md.
+Para integrar aceleradores, consultar docs/expansion-interface.md.
+La plataforma FPGA fue validada posteriormente; consultar
+docs/fpga-kv260.md.
+
 TFG - SUBPUNTO: PROGRAMA BARE-METAL + ACELERADOR MMIO
 
 Archivos nuevos (no sustituir RTL ni modelos existentes):

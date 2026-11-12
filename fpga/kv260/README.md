@@ -15,6 +15,16 @@ la restricción XDC del ventilador, el script de implementación y reportes.
 
 El proyecto Vivado debe reconstruirse en un directorio independiente.
 No cargar ni programar placa hasta verificar DFX Manager, DTBO, reloj y
-recuperación del overlay anterior. El script `run_p2_8_1.sh` presupone
-ruta `$HOME/tfg_rv64i` y board part `xilinx.com:kv260_som:part0:1.4`.
-Si se cambia el árbol de archivos, revisar las rutas antes de ejecutar.
+recuperación del overlay anterior.
+
+El script `run_p2_8_1.sh` actualizado obtiene la raíz del repositorio
+desde su propia ubicación, sin exigir el nombre de la rama histórica.
+Admite `TFG_FPGA_RUNS_DIR` para configurar la ubicación de resultados.
+Conserva las comprobaciones de ascendencia Git, árbol limpio e integridad
+del wrapper. El board part de referencia es
+`xilinx.com:kv260_som:part0:1.4`.
+
+Para la utilización actual, consultar la
+[guía de la plataforma KV260](../../docs/fpga-kv260.md).
+La ejecución del script actualizado con Vivado sigue pendiente
+de validación específica.

@@ -10,6 +10,15 @@ Los hashes y límites del ensayo se documentan en
 Actualización del 11 de noviembre de 2026: se completaron dos ejecuciones físicas satisfactorias del programa de demostración con `RESULT_FLAG=1`. La segunda ejecución confirmó `CONTROL=0` y se restauró `k26-starter-kits` al slot 0.
 La restauración se comprobó mediante DFX Manager, servicios activos y lecturas térmicas. No se acreditó una prueba funcional exhaustiva del overlay original ni medición independiente de RPM.
 Informe actualizado: `docs/verification/fpga/cierre_kv260_20261111/README.md`.
+
+Para nuevos usuarios, consultar la
+[guía FPGA KV260](../../docs/fpga-kv260.md).
+
+La sección histórica inferior conserva la decisión anterior de no
+versionar binarios FPGA. La distribución final desde GitHub está en
+preparación y requiere confirmar autorización y condiciones de licencia.
+No interpretar aquella decisión histórica como el estado definitivo
+de la entrega.
 No modificar `default_firmware` ni suponer control de ventilador validado
 por lectura RPM.
 
