@@ -1,4 +1,4 @@
-# Candidato de entrega — Plataforma RISC-V RV64I
+# Notas de entrega — Plataforma RISC-V RV64I (v1.0.0)
 
 Fecha de preparación: 12 de noviembre de 2026.
 
@@ -6,7 +6,11 @@ Proyecto: Desarrollo y verificación de un núcleo RISC-V
 RV64I con interfaz de expansión para aceleradores en FPGA.
 
 Estado: integrado en `main` el 12 de noviembre de 2026.
-La etiqueta y la GitHub Release están pendientes.
+La versión `v1.0.0` fue publicada posteriormente desde
+el commit `73694be`.
+La rama `main` incorporó después la limpieza `ba29e03`.
+
+[Publicación oficial v1.0.0](https://github.com/ECASLab/risc-v-template/releases/tag/v1.0.0).
 
 ## 1. Componentes de la plataforma
 
@@ -113,7 +117,17 @@ Consultar [estado de entrega](release-readiness.md).
 
 ## 6. Versión
 
-Estas notas describen el contenido integrado en `main`.
+Estas notas describen la plataforma entregada en
+la publicación `v1.0.0`, correspondiente al commit
+`73694be`.
 
-La etiqueta de versión y los artefactos descargables
-se prepararán en GitHub Releases.
+La revisión posterior `ba29e03` de `main` eliminó
+archivos obsoletos sin modificar el RTL respecto
+de la versión publicada.
+
+Los paquetes FPGA histórico y reconstruido,
+junto con sus comprobaciones SHA-256, están
+disponibles en la [Release v1.0.0](https://github.com/ECASLab/risc-v-template/releases/tag/v1.0.0).
+
+Las evidencias técnicas conservan las revisiones
+originales de las campañas documentadas.

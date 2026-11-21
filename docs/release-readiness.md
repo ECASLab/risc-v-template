@@ -1,14 +1,16 @@
-# Estado de preparación de la entrega
+# Estado de publicación y condiciones pendientes
 
-Este documento controla la preparación de la plataforma
-RV64I reutilizable para su distribución desde GitHub.
+Este documento registra la publicación de la plataforma
+RV64I y las condiciones que siguen pendientes de confirmación.
 
-Rama de distribución: `main`.
-Rama de desarrollo conservada: `entrega/plataforma-reutilizable`.
+Rama principal vigente: `main`.
+La rama histórica `entrega/plataforma-reutilizable`
+se utilizó durante la preparación de la entrega.
 
 Corte técnico de reconstrucción: `86fb682`.
 Integración inicial en `main`: `c745409`.
-La etiqueta definitiva identificará la revisión publicada.
+Publicación `v1.0.0`: `73694be`.
+Limpieza posterior de `main`: `ba29e03`.
 
 ## 1. Uso de la plataforma
 
@@ -56,37 +58,42 @@ reproducida. No fue probado físicamente de nuevo.
 Las dos versiones tienen bitstreams con SHA-256
 diferentes y no deben presentarse como idénticos.
 
-## 4. Política de distribución propuesta
+## 4. Distribución publicada y condiciones de uso
 
-- Código, herramientas y documentación autorizados:
+- Código, herramientas y documentación:
   repositorio Git.
-- Binarios FPGA autorizados: archivos de una
-  GitHub Release.
+- Binarios FPGA: archivos publicados en
+  [GitHub Release v1.0.0](https://github.com/ECASLab/risc-v-template/releases/tag/v1.0.0).
 - Versiones: identificadas mediante etiquetas Git.
 - Integridad: manifiestos y SHA-256.
 - Dependencias AMD: documentadas separadamente.
 
-La publicación de cualquiera de estos componentes
-depende de contar con los permisos correspondientes.
+Los archivos fueron publicados. Esto no acredita por sí mismo
+la titularidad, las licencias ni los permisos de redistribución.
 
-## 5. Condiciones pendientes de liberación
+## 5. Hitos de publicación y condiciones por confirmar
 
 - [ ] Confirmar titularidad y autorización del código.
 - [ ] Elegir y aprobar la licencia del repositorio.
 - [ ] Revisar atribuciones y licencias de terceros.
 - [ ] Resolver autorización para redistribuir firmware.
 - [x] Completar revisión estática de documentación (D.7.d).
-- [ ] Conciliar objetivos y entregables del TFG.
+- [x] Conciliar objetivos y entregables del TFG.
+  Referencia: [especificación técnica](technical-specification.md), sección 7.
+  Consolidación documental retrospectiva; no implica nuevas pruebas.
 - [x] Integrar la rama de entrega en `main` (D.7.h).
-- [ ] Crear etiqueta de versión y GitHub Release.
+- [x] Crear etiqueta de versión y GitHub Release (`v1.0.0`).
 - [ ] Verificar descarga desde GitHub.
 
 ## 6. Estado actual
 
 Código y documentación: integrados en `main`.
-GitHub Release: pendiente de preparación.
-Firmware de terceros: sujeto a las condiciones de
-redistribución aplicables.
+GitHub Release: `v1.0.0`, publicada desde `73694be`.
+Las evidencias conservan las revisiones originales
+de las campañas de validación documentadas.
+El firmware reconstruido no fue validado nuevamente
+en hardware. Las condiciones de redistribución de
+terceros siguen sujetas a confirmación.
 
 Este documento no concede una licencia, no sustituye
 la autorización institucional y no certifica que los

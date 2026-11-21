@@ -139,9 +139,17 @@ La implementación validada utiliza un período
 de reloj de 17 ns, equivalente aproximadamente
 a 58,824 MHz.
 
-El firmware compilado se conserva actualmente
-en respaldos verificados y está pendiente de
-incorporación a la distribución final.
+La [publicación v1.0.0](https://github.com/ECASLab/risc-v-template/releases/tag/v1.0.0)
+incluye dos paquetes FPGA diferenciados:
+
+- `KV260_HISTORICO_VALIDADO_8a8e743.zip`:
+  utilizado en las demostraciones físicas documentadas.
+- `KV260_RECONSTRUIDO_NO_VALIDADO_HARDWARE.zip`:
+  reconstruido y empaquetado, sin una nueva prueba en placa.
+
+Los bitstreams no son binariamente idénticos.
+La publicación incluye `SHA256SUMS_RELEASE.txt`
+para comprobar la integridad de los paquetes.
 
 **No programar la FPGA sin comprobar la
 compatibilidad del firmware, la ventilación,
@@ -168,8 +176,12 @@ El ejecutor ACT4 histórico todavía no constituye
 un target general `make act4` reproducible
 desde cualquier instalación.
 
-La reconstrucción completa del bitstream desde
-un clon limpio todavía requiere validación específica.
+El flujo de implementación se reprodujo desde
+un clon independiente con Vivado 2024.1 hasta
+el diseño enrutado y sus reportes.
+Posteriormente se generaron el bitstream y el
+paquete PL_FLAT reconstruidos, sin una nueva
+validación física en la KV260.
 
 ## Organización del repositorio
 
@@ -187,8 +199,11 @@ un clon limpio todavía requiere validación específica.
 
 ## Estado de distribución
 
-El repositorio está en preparación para su entrega
-como plataforma académica reutilizable.
+El repositorio dispone de la publicación `v1.0.0`,
+correspondiente al commit `73694be`.
+La rama `main` incorpora la limpieza posterior
+`ba29e03`, sin cambios en el RTL respecto de
+la versión publicada.
 
 Las condiciones de licencia y redistribución
 deben confirmarse con los responsables del proyecto
@@ -200,12 +215,13 @@ de terceros.
 
 ## Documentación técnica adicional
 
+- [Especificación técnica de la plataforma](docs/technical-specification.md).
 - [Resumen y limitaciones ACT4](verification/act4/README.md).
 - [Cierre de verificación FPGA](docs/verification/fpga/cierre_kv260_20261111/README.md).
 - [Reproducibilidad del clon](docs/verification/fpga/cierre_kv260_20261111/REPRODUCIBILIDAD_CLON.md).
 
 Las guías de instalación, extensión y reconstrucción
-se consolidarán como parte de la entrega final.
+están disponibles en los enlaces anteriores.
 
 ## Estado de entrega
 
