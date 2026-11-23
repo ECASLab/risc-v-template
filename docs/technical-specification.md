@@ -2,12 +2,11 @@
 
 **Proyecto:** Desarrollo y verificación de un núcleo RISC-V RV64I con interfaz de expansión para aceleradores en FPGA\
 **Institución:** Tecnológico de Costa Rica — Escuela de Ingeniería Electrónica / ECASLab\
-**Estado del documento:** borrador de consolidación para revisión (rev. documental 0.1)\
 **Fecha de consolidación:** 21 de noviembre de 2026\
 **Línea base técnica consultada:** `main`, commit `ba29e036df4416f0cb99acfe3701b95fbb02dc18`\
 **Publicación previa del proyecto:** [`v1.0.0`](https://github.com/ECASLab/risc-v-template/releases/tag/v1.0.0), commit `73694be98c44cbf6d6e4db182fc52521cb0218e2`
 
-> **Naturaleza del documento.** Esta especificación consolida *a posteriori* los requerimientos, contratos y criterios que figuran en el anteproyecto actualizado, en el Capítulo 3 del informe final y en los archivos de la plataforma. No sustituye esas fuentes ni afirma haber existido antes de las campañas de verificación. La revisión documental 0.1 no es una nueva versión del RTL, del bitstream ni de la publicación GitHub.
+> **Naturaleza del documento.** Esta especificación consolida los requerimientos, contratos y criterios que figuran en el Capítulo 3 del informe final y en los archivos de la plataforma. No sustituye esas fuentes ni afirma haber existido antes de las campañas de verificación. La revisión documental 0.1 no es una nueva versión del RTL, del bitstream ni de la publicación GitHub.
 
 ## 1. Propósito, destinatarios y fuentes de verdad
 
